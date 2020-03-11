@@ -1,8 +1,11 @@
 package main
 
 import (
-	"NorthwindREST/model"
+	"NorthwindREST/db"
+	"encoding/json"
 	"fmt"
+	"github.com/gorilla/mux"
+	"log"
 	"net/http"
 )
 
@@ -10,15 +13,51 @@ func homeLink(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Welcome home!")
 }
 
-func test(w http.ResponseWriter, r *http.Request){
-	fmt.Fprintf(w, "Hello again")
+func getItems(w http.ResponseWriter, r *http.Request) {
+	enableCors(w)
+	a, er := db.AllItems()
+	if er != nil {
+		fmt.Print(er)
+	}
+	resp, _ := json.Marshal(a)
+	fmt.Fprintf(w, string(resp))
+}
+
+func enableCors(w http.ResponseWriter) {
+	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:8080")
+}
+
+func createOrder(w http.ResponseWriter, r *http.Request) {
+	enableCors(w)
+	order := db.Order{}
+	er := json.NewDecoder(r.Body).Decode(&order)
+	if er != nil {
+		http.Error(w, er.Error(), http.StatusBadRequest)
+		return
+	}
+	for _, item := range order.Items {
+		if er = db.UpdateItemCount(item); er != nil {
+			http.Error(w, er.Error(), http.StatusInternalServerError)
+		}
+	}
+	if er = db.CreateOrder(order); er != nil {
+		http.Error(w, er.Error(), http.StatusInternalServerError)
+	}
+	fmt.Fprintf(w, "Order created")
 }
 
 func main() {
-	model.InitDB("user=postgres password=N0coments dbname=northwindstoredb sslmode=disable")
-	fmt.Println(model.AllItems())
-/*	router := mux.NewRouter().StrictSlash(true)
-	router.HandleFunc("/", homeLink).Methods("GET")
-	router.HandleFunc("/hello", test).Methods("GET")
-	log.Fatal(http.ListenAndServe(":8080", router))*/
+	db.InitDB("user=postgres password=N0coments dbname=northwindstoredb sslmode=disable")
+	/*	items := [2]db.OrderItem{{Id: 1, Count: 1}, {Id: 2, Count: 1}}
+		for _, item := range items {
+			db.UpdateItemCount(item)
+		}
+		db.CreateOrder(db.Order{Items: items[0:2]})*/
+
+	router := mux.NewRouter()
+	router.Handle("/", http.FileServer(http.Dir("./view/")))
+	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static/"))))
+	router.HandleFunc("/api/getItems", getItems).Methods(http.MethodGet)
+	router.HandleFunc("/api/createOrder", createOrder).Methods(http.MethodPost)
+	log.Fatal(http.ListenAndServe(":8001", router))
 }

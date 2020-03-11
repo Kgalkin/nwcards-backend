@@ -1,4 +1,4 @@
-package model
+package db
 
 import (
 	"database/sql"
@@ -14,7 +14,6 @@ func InitDB(dataSourceName string) {
 	if err != nil {
 		log.Panic(err)
 	}
-
 	if err = db.Ping(); err != nil {
 		log.Panic(err)
 	}
