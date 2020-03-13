@@ -35,7 +35,7 @@ func createOrder(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, er.Error(), http.StatusBadRequest)
 		return
 	}
-	for _, item := range order.Items {
+	for _, item := range order.Data.Items {
 		if er = db.UpdateItemCount(item); er != nil {
 			http.Error(w, er.Error(), http.StatusInternalServerError)
 		}
@@ -48,11 +48,6 @@ func createOrder(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	db.InitDB("user=postgres password=N0coments dbname=northwindstoredb sslmode=disable")
-	/*	items := [2]db.OrderItem{{Id: 1, Count: 1}, {Id: 2, Count: 1}}
-		for _, item := range items {
-			db.UpdateItemCount(item)
-		}
-		db.CreateOrder(db.Order{Items: items[0:2]})*/
 
 	router := mux.NewRouter()
 	router.Handle("/", http.FileServer(http.Dir("./view/")))

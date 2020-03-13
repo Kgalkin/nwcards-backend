@@ -78,6 +78,7 @@ func ItemWithId(id int64) (*StoreItem, error) {
 func AllItems() ([]*StoreItem, error) {
 	rows, err := db.Query("SELECT * FROM store_items")
 	if err != nil {
+		log.Println(err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -86,11 +87,13 @@ func AllItems() ([]*StoreItem, error) {
 		item := new(StoreItem)
 		err := rows.Scan(&item.Id, &item.Data, &item.Price, &item.InStock, pq.Array(&item.Tags))
 		if err != nil {
+			log.Println(err)
 			return nil, err
 		}
 		items = append(items, item)
 	}
 	if err = rows.Err(); err != nil {
+		log.Println(err)
 		return nil, err
 	}
 	return items, nil
