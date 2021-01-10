@@ -1,6 +1,7 @@
 package db
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -40,7 +41,7 @@ func (d StoreItemData) String() string {
 }
 
 func UpdateItemCount(item OrderItem) error {
-	data, _ := ItemWithId(item.Id)
+	data, _ := GetItem(item.Id)
 	if data.InStock < item.Count {
 		er := errors.New("Instock < count")
 		log.Println(er)
@@ -54,7 +55,21 @@ func UpdateItemCount(item OrderItem) error {
 	return nil
 }
 
-func ItemWithId(id int64) (*StoreItem, error) {
+func UpdateItem(item StoreItem) (*StoreItem, error) {
+	_, er := db.Query(`UPDATE store_items SET data = $2,
+ 	price = $3,
+  	instock = $4,
+  	tags = $5 
+  	WHERE id = $1`,
+		item.Id, item.Data.String(), item.Price, item.InStock, pq.Array(item.Tags))
+	if er != nil {
+		log.Println(er)
+
+	}
+	return GetItem(item.Id)
+}
+
+func GetItem(id int64) (*StoreItem, error) {
 	rows, err := db.Query("SELECT * FROM store_items WHERE id = $1", id)
 	if err != nil {
 		log.Println(err)
@@ -75,13 +90,28 @@ func ItemWithId(id int64) (*StoreItem, error) {
 	return item, nil
 }
 
-func AllItems() ([]*StoreItem, error) {
+func CreateItem(i StoreItem) (*StoreItem, error) {
+	rows, err := db.Query("INSERT INTO store_items (data, price, instock, tags) VALUES ($1, $2, $3, $4) returning *",
+		i.Data.String(), i.Price, i.InStock, pq.Array(i.Tags))
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+	items, err := rowsToStoreItems(rows)
+	return items[0], err
+}
+
+func GetAllItems() ([]*StoreItem, error) {
 	rows, err := db.Query("SELECT * FROM store_items")
 	if err != nil {
 		log.Println(err)
 		return nil, err
 	}
 	defer rows.Close()
+	return rowsToStoreItems(rows)
+}
+
+func rowsToStoreItems(rows *sql.Rows) ([]*StoreItem, error) {
 	items := make([]*StoreItem, 0)
 	for rows.Next() {
 		item := new(StoreItem)
@@ -92,7 +122,7 @@ func AllItems() ([]*StoreItem, error) {
 		}
 		items = append(items, item)
 	}
-	if err = rows.Err(); err != nil {
+	if err := rows.Err(); err != nil {
 		log.Println(err)
 		return nil, err
 	}
