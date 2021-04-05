@@ -1,7 +1,7 @@
 package main
 
 import (
-	"NorthwindREST/db"
+	"NorthwindREST/src/go/models/db"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -28,7 +28,7 @@ func getItems(w http.ResponseWriter, r *http.Request) {
 }
 
 func enableCors(w http.ResponseWriter) {
-	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:8080")
+	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:9090")
 	w.Header().Set("Content-Type", "application/json")
 }
 
@@ -67,7 +67,7 @@ func createItem(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, er.Error(), http.StatusBadRequest)
 		return
 	}
-	files := r.MultipartForm.File["images"]
+	files := r.MultipartForm.File["image"]
 	for _, file := range files {
 		f, er := file.Open()
 		if er != nil {
@@ -88,7 +88,39 @@ func createItem(w http.ResponseWriter, r *http.Request) {
 	}
 	a, er := db.GetAllItems()
 	resp, _ := json.Marshal(a)
-	fmt.Println(w, resp)
+	fmt.Fprintf(w, string(resp))
+}
+
+func getTags(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+	enableCors(w)
+	allTags, er := db.GetTags()
+	if er != nil {
+		http.Error(w, er.Error(), http.StatusBadRequest)
+		return
+	}
+	resp, _ := json.Marshal(allTags)
+	fmt.Fprintf(w, string(resp))
+}
+
+func createTag(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+	enableCors(w)
+	tags := new([]string)
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	er := decoder.Decode(&tags)
+	if er != nil {
+		http.Error(w, er.Error(), http.StatusBadRequest)
+		return
+	}
+	allTags, er := db.CreateTags(*tags)
+	if er != nil {
+		http.Error(w, er.Error(), http.StatusBadRequest)
+		return
+	}
+	resp, _ := json.Marshal(allTags)
+	fmt.Fprintf(w, string(resp))
 }
 
 func uploadFile(w http.ResponseWriter, r *http.Request) {
@@ -223,6 +255,8 @@ func main() {
 	router.HandleFunc("/api/items", createItem).Methods(http.MethodPost)
 	router.HandleFunc("/api/createOrder", createOrder).Methods(http.MethodPost)
 	router.HandleFunc("/api/items/{id}/uploadCoverImage", uploadFile).Methods(http.MethodPost)
+	router.HandleFunc("/api/tags", createTag).Methods(http.MethodPost)
+	router.HandleFunc("/api/tags", getTags).Methods(http.MethodGet)
 	router.Handle("/", http.FileServer(http.Dir("./view/")))
-	log.Fatal(http.ListenAndServe(":8001", router))
+	log.Fatal(http.ListenAndServe("192.168.0.101:8081", router))
 }
