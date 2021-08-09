@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"io"
 	"log"
@@ -56,6 +57,7 @@ func createOrder(w http.ResponseWriter, r *http.Request) {
 func createItem(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	enableCors(w)
+	r.Header.Get("content-type")
 	er := r.ParseMultipartForm(32 << 20) // limit your max input length!
 	if er != nil {
 		http.Error(w, er.Error(), http.StatusBadRequest)
@@ -68,6 +70,7 @@ func createItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	files := r.MultipartForm.File["image"]
+	var items []db.StoreItem
 	for _, file := range files {
 		f, er := file.Open()
 		if er != nil {
@@ -85,9 +88,27 @@ func createItem(w http.ResponseWriter, r *http.Request) {
 		osFile, _ := os.OpenFile(filepath.Join(dirPath, fileName), os.O_WRONLY|os.O_CREATE, 0666)
 		defer osFile.Close()
 		io.Copy(osFile, f)
+		items = append(items, *i)
 	}
-	a, er := db.GetAllItems()
-	resp, _ := json.Marshal(a)
+	resp, _ := json.Marshal(items)
+	fmt.Fprintf(w, string(resp))
+}
+
+func editItem(w http.ResponseWriter, r *http.Request) {
+	enableCors(w)
+	storeItem := db.StoreItem{}
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	er := decoder.Decode(&storeItem)
+	if er != nil {
+		http.Error(w, er.Error(), http.StatusBadRequest)
+		return
+	}
+	updated, er := db.UpdateItem(storeItem)
+	if er != nil {
+		http.Error(w, er.Error(), http.StatusInternalServerError)
+	}
+	resp, _ := json.Marshal(updated)
 	fmt.Fprintf(w, string(resp))
 }
 
@@ -250,6 +271,7 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	router := mux.NewRouter()
+	router.Use(func(next http.Handler) http.Handler { return handlers.LoggingHandler(os.Stdout, next) })
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static/"))))
 	router.HandleFunc("/api/items", getItems).Methods(http.MethodGet)
 	router.HandleFunc("/api/items", createItem).Methods(http.MethodPost)
@@ -258,5 +280,5 @@ func main() {
 	router.HandleFunc("/api/tags", createTag).Methods(http.MethodPost)
 	router.HandleFunc("/api/tags", getTags).Methods(http.MethodGet)
 	router.Handle("/", http.FileServer(http.Dir("./view/")))
-	log.Fatal(http.ListenAndServe("192.168.0.101:8081", router))
+	log.Fatal(http.ListenAndServe("localhost:8081", router))
 }
