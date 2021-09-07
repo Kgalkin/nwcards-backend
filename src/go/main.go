@@ -141,26 +141,42 @@ func createTag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	resp, _ := json.Marshal(allTags)
-	fmt.Fprintf(w, string(resp))
+	_, er = fmt.Fprintf(w, string(resp))
+	if er != nil {
+		http.Error(w, er.Error(), http.StatusBadRequest)
+		return
+	}
 }
 
 func uploadFile(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	id := params["id"]
-	r.ParseMultipartForm(32 << 20) // limit your max input length!
+	err := r.ParseMultipartForm(32 << 20) // limit your max input length!
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	file, header, err := r.FormFile("image")
 	if err != nil {
-		panic(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 	defer file.Close()
 	name := strings.Split(header.Filename, ".")
 	dirPath := fmt.Sprintf("./static/img/%s", id)
-	os.MkdirAll(dirPath, os.ModePerm)
+	err = os.MkdirAll(dirPath, os.ModePerm)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	fileName := fmt.Sprintf("%s_cover.%s", id, name[1])
 	osFile, _ := os.OpenFile(filepath.Join(dirPath, fileName), os.O_WRONLY|os.O_CREATE, 0666)
 	defer file.Close()
-	io.Copy(osFile, file)
-	return
+	_, err = io.Copy(osFile, file)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 func send(body string) {
