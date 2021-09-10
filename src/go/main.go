@@ -9,6 +9,7 @@ import (
 	"github.com/gorilla/mux"
 	"io"
 	"log"
+	"mime/multipart"
 	"net"
 	"net/http"
 	"net/mail"
@@ -82,12 +83,12 @@ func createItem(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, er.Error(), http.StatusBadRequest)
 			return
 		}
-		dirPath := fmt.Sprintf("./static/img/%1d", i.Id)
-		os.MkdirAll(dirPath, os.ModePerm)
-		fileName := fmt.Sprintf("%d_cover.%s", i.Id, strings.Split(file.Filename, ".")[1])
-		osFile, _ := os.OpenFile(filepath.Join(dirPath, fileName), os.O_WRONLY|os.O_CREATE, 0666)
-		defer osFile.Close()
-		io.Copy(osFile, f)
+		filePath := fmt.Sprintf("./static/img/%[1]d/%[1]d_cover.%[2]s", i.Id, strings.Split(file.Filename, ".")[1])
+		er = makeDirAndSaveFile(f, filePath)
+		if er != nil {
+			http.Error(w, er.Error(), http.StatusBadRequest)
+			return
+		}
 		items = append(items, *i)
 	}
 	resp, _ := json.Marshal(items)
@@ -163,7 +164,13 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 	name := strings.Split(header.Filename, ".")
-	dirPath := fmt.Sprintf("./static/img/%s", id)
+	err = makeDirAndSaveFile(file,
+		filepath.Join("static", "img", id, fmt.Sprintf("%s_cover.%s", id, name[1])))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	/*dirPath := fmt.Sprintf("./static/img/%s", id)
 	err = os.MkdirAll(dirPath, os.ModePerm)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -176,7 +183,22 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}*/
+}
+
+func makeDirAndSaveFile(file multipart.File, path string) error {
+	dir := filepath.Dir(path)
+	err := os.MkdirAll(dir, os.ModePerm)
+	if err != nil {
+		return err
 	}
+	osFile, _ := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0666)
+	defer osFile.Close()
+	_, err = io.Copy(osFile, file)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func send(body string) {
@@ -295,6 +317,6 @@ func main() {
 	router.HandleFunc("/api/items/{id}/uploadCoverImage", uploadFile).Methods(http.MethodPost)
 	router.HandleFunc("/api/tags", createTag).Methods(http.MethodPost)
 	router.HandleFunc("/api/tags", getTags).Methods(http.MethodGet)
-	router.Handle("/", http.FileServer(http.Dir("./view/")))
+	router.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./view/index.html") })
 	log.Fatal(http.ListenAndServe("localhost:8081", router))
 }

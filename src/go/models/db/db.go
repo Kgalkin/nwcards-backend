@@ -8,7 +8,8 @@ import (
 var db *sql.DB
 
 func InitDB(dataSourceName string) {
-	db, err := sql.Open("postgres", dataSourceName)
+	var err error
+	db, err = sql.Open("postgres", dataSourceName)
 	if err != nil {
 		panic(err)
 	}
