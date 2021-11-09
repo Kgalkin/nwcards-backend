@@ -19,6 +19,7 @@ import (
 	"strings"
 )
 
+//public routes
 func getItems(w http.ResponseWriter, r *http.Request) {
 	enableCors(w)
 	a, er := db.GetAllItems()
@@ -29,9 +30,16 @@ func getItems(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, string(resp))
 }
 
-func enableCors(w http.ResponseWriter) {
-	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:9090")
-	w.Header().Set("Content-Type", "application/json")
+func getTags(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+	enableCors(w)
+	allTags, er := db.GetTags()
+	if er != nil {
+		http.Error(w, er.Error(), http.StatusBadRequest)
+		return
+	}
+	resp, _ := json.Marshal(allTags)
+	fmt.Fprintf(w, string(resp))
 }
 
 func createOrder(w http.ResponseWriter, r *http.Request) {
@@ -55,18 +63,21 @@ func createOrder(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Order created")
 }
 
+//private
 func createItem(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	enableCors(w)
 	r.Header.Get("content-type")
 	er := r.ParseMultipartForm(32 << 20) // limit your max input length!
 	if er != nil {
+		fmt.Println(er.Error())
 		http.Error(w, er.Error(), http.StatusBadRequest)
 		return
 	}
 	item := db.StoreItem{}
 	er = json.Unmarshal([]byte(r.FormValue("data")), &item)
 	if er != nil {
+		fmt.Println(er.Error())
 		http.Error(w, er.Error(), http.StatusBadRequest)
 		return
 	}
@@ -75,17 +86,20 @@ func createItem(w http.ResponseWriter, r *http.Request) {
 	for _, file := range files {
 		f, er := file.Open()
 		if er != nil {
+			fmt.Println(er.Error())
 			http.Error(w, er.Error(), http.StatusBadRequest)
 			return
 		}
 		i, er := db.CreateItem(item)
 		if er != nil {
+			fmt.Println(er.Error())
 			http.Error(w, er.Error(), http.StatusBadRequest)
 			return
 		}
 		filePath := fmt.Sprintf("./static/img/%[1]d/%[1]d_cover.%[2]s", i.Id, strings.Split(file.Filename, ".")[1])
 		er = makeDirAndSaveFile(f, filePath)
 		if er != nil {
+			fmt.Println(er.Error())
 			http.Error(w, er.Error(), http.StatusBadRequest)
 			return
 		}
@@ -110,18 +124,6 @@ func editItem(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, er.Error(), http.StatusInternalServerError)
 	}
 	resp, _ := json.Marshal(updated)
-	fmt.Fprintf(w, string(resp))
-}
-
-func getTags(w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
-	enableCors(w)
-	allTags, er := db.GetTags()
-	if er != nil {
-		http.Error(w, er.Error(), http.StatusBadRequest)
-		return
-	}
-	resp, _ := json.Marshal(allTags)
 	fmt.Fprintf(w, string(resp))
 }
 
@@ -170,22 +172,19 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	/*dirPath := fmt.Sprintf("./static/img/%s", id)
-	err = os.MkdirAll(dirPath, os.ModePerm)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	fileName := fmt.Sprintf("%s_cover.%s", id, name[1])
-	osFile, _ := os.OpenFile(filepath.Join(dirPath, fileName), os.O_WRONLY|os.O_CREATE, 0666)
-	defer file.Close()
-	_, err = io.Copy(osFile, file)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}*/
 }
 
+//handlers
+func enableCors(w http.ResponseWriter) {
+	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:9090")
+	appJson(w)
+}
+
+func appJson(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
+}
+
+//functions
 func makeDirAndSaveFile(file multipart.File, path string) error {
 	dir := filepath.Dir(path)
 	err := os.MkdirAll(dir, os.ModePerm)
@@ -313,10 +312,10 @@ func main() {
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static/"))))
 	router.HandleFunc("/api/items", getItems).Methods(http.MethodGet)
 	router.HandleFunc("/api/items", createItem).Methods(http.MethodPost)
-	router.HandleFunc("/api/createOrder", createOrder).Methods(http.MethodPost)
+	router.HandleFunc("/api/orders", createOrder).Methods(http.MethodPost)
 	router.HandleFunc("/api/items/{id}/uploadCoverImage", uploadFile).Methods(http.MethodPost)
 	router.HandleFunc("/api/tags", createTag).Methods(http.MethodPost)
 	router.HandleFunc("/api/tags", getTags).Methods(http.MethodGet)
 	router.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./view/index.html") })
-	log.Fatal(http.ListenAndServe("localhost:8081", router))
+	log.Fatal(http.ListenAndServe("localhost:8080", router))
 }

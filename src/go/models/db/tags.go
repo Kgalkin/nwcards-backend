@@ -1,49 +1,45 @@
 package db
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 )
 
-func GetTags() ([]*string, error) {
+type Tag struct {
+	Value string `json:"value"`
+	Id    int    `json:"id"`
+}
+
+func GetTags() ([]*Tag, error) {
 	rows, err := db.Query("SELECT * FROM tags")
 	if err != nil {
 		log.Println(err)
 		return nil, err
 	}
-	items := make([]*string, 0)
-	for rows.Next() {
-		item := new(string)
-		err := rows.Scan(&item)
-		if err != nil {
-			log.Println(err)
-			return nil, err
-		}
-		items = append(items, item)
-	}
-	if err := rows.Err(); err != nil {
-		log.Println(err)
-		return nil, err
-	}
-	return items, nil
+	return readTags(rows)
 }
 
-func CreateTags(tags []string) ([]*string, error) {
-	sqlExpr := "INSERT INTO tags (tag) VALUES "
+func CreateTags(tags []string) ([]*Tag, error) {
+	sqlExpr := "INSERT INTO tags (value) VALUES "
 	for _, tag := range tags {
 		sqlExpr += fmt.Sprintf("('%s'),", tag)
 	}
 	sqlExpr = sqlExpr[:len(sqlExpr)-1]
-	sqlExpr += " on conflict DO NOTHING returning *"
+	sqlExpr += " on conflict DO NOTHING; SELECT * FROM tags;"
 	rows, err := db.Query(sqlExpr)
 	if err != nil {
 		log.Println(err)
 		return nil, err
 	}
-	items := make([]*string, 0)
+	return readTags(rows)
+}
+
+func readTags(rows *sql.Rows) ([]*Tag, error) {
+	items := make([]*Tag, 0)
 	for rows.Next() {
-		item := new(string)
-		err := rows.Scan(&item)
+		item := new(Tag)
+		err := rows.Scan(&item.Value, &item.Id)
 		if err != nil {
 			log.Println(err)
 			return nil, err

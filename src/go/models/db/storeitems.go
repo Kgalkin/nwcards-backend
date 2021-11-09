@@ -23,16 +23,12 @@ func (i *StoreItemData) Scan(src interface{}) error {
 	return json.Unmarshal(uintVal, i)
 }
 
-type Tags struct {
-	Tags []string
-}
-
 type StoreItem struct {
 	Id      int64         `json:"id"`
 	Data    StoreItemData `json:"data"`
 	Price   int           `json:"price"`
 	InStock int           `json:"inStock"`
-	Tags    []string      `json:"tags"`
+	Tags    []int64       `json:"tags"`
 }
 
 func (d StoreItemData) String() string {
