@@ -1,6 +1,7 @@
 package main
 
 import (
+	"NorthwindREST/src/go/imageprocessing"
 	"NorthwindREST/src/go/models/db"
 	"crypto/tls"
 	"encoding/json"
@@ -22,7 +23,7 @@ import (
 //public routes
 func getItems(w http.ResponseWriter, r *http.Request) {
 	enableCors(w)
-	a, er := db.GetAllItems()
+	a, er := db.GetAllItems(r.URL.Query())
 	if er != nil {
 		fmt.Print(er)
 	}
@@ -39,6 +40,21 @@ func getTags(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	resp, _ := json.Marshal(allTags)
+	fmt.Fprintf(w, string(resp))
+}
+
+func getMenu(w http.ResponseWriter, r *http.Request) {
+	enableCors(w)
+	menuItems, er := db.GetMenuItems()
+	if er != nil {
+		http.Error(w, er.Error(), http.StatusBadRequest)
+		return
+	}
+	resp, er := json.Marshal(menuItems)
+	if er != nil {
+		http.Error(w, er.Error(), http.StatusBadRequest)
+		return
+	}
 	fmt.Fprintf(w, string(resp))
 }
 
@@ -96,8 +112,23 @@ func createItem(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, er.Error(), http.StatusBadRequest)
 			return
 		}
-		filePath := fmt.Sprintf("./static/img/%[1]d/%[1]d_cover.%[2]s", i.Id, strings.Split(file.Filename, ".")[1])
-		er = makeDirAndSaveFile(f, filePath)
+		filePathOriginal := fmt.Sprintf("./static/img/%[1]d/%[1]d_original.%[2]s", i.Id, strings.Split(file.Filename, ".")[1])
+		filePathShort := fmt.Sprintf("./static/img/%[1]d/%[1]d_short.webp", i.Id, strings.Split(file.Filename, ".")[1])
+		er = makeDirAndSaveFile(f, filePathOriginal)
+		if er != nil {
+			fmt.Println(er.Error())
+			http.Error(w, er.Error(), http.StatusBadRequest)
+			return
+		}
+		i.Data.Links.Original = filePathOriginal
+		i.Data.Links.Short = filePathShort
+		er = imageprocessing.Compress(filePathOriginal, 40, filePathShort)
+		if er != nil {
+			fmt.Println(er.Error())
+			http.Error(w, er.Error(), http.StatusBadRequest)
+			return
+		}
+		_, er = db.UpdateItem(*i)
 		if er != nil {
 			fmt.Println(er.Error())
 			http.Error(w, er.Error(), http.StatusBadRequest)
@@ -304,6 +335,7 @@ func sendEmail(recipient, text string) error {
 
 func main() {
 	//sendEmail("galkin_kirill@mail.ru", "hello")
+	imageprocessing.Compress("./static/img/3/3_original.jpg", 40, "./static/img/3/3_short.webp")
 	db.InitDB("user=postgres password=N0coments dbname=northwindstoredb sslmode=disable")
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
@@ -316,6 +348,7 @@ func main() {
 	router.HandleFunc("/api/items/{id}/uploadCoverImage", uploadFile).Methods(http.MethodPost)
 	router.HandleFunc("/api/tags", createTag).Methods(http.MethodPost)
 	router.HandleFunc("/api/tags", getTags).Methods(http.MethodGet)
+	router.HandleFunc("/api/menu", getMenu).Methods(http.MethodGet)
 	router.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./view/index.html") })
 	log.Fatal(http.ListenAndServe("localhost:8080", router))
 }
