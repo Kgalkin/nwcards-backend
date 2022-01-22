@@ -17,6 +17,7 @@ import (
 	"net/smtp"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -140,14 +141,29 @@ func createItem(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, string(resp))
 }
 
-func editItem(w http.ResponseWriter, r *http.Request) {
+func updateItem(w http.ResponseWriter, r *http.Request) {
 	enableCors(w)
+	params := mux.Vars(r)
+	id := params["id"]
+	if len(id) != 1 {
+		http.Error(w, "There should be 1 item id in request "+r.URL.Path, http.StatusBadRequest)
+		return
+	}
+	idInt, er := strconv.ParseInt(id, 0, 64)
+	if er != nil {
+		http.Error(w, er.Error(), http.StatusBadRequest)
+		return
+	}
 	storeItem := db.StoreItem{}
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
-	er := decoder.Decode(&storeItem)
+	er = decoder.Decode(&storeItem)
 	if er != nil {
 		http.Error(w, er.Error(), http.StatusBadRequest)
+		return
+	}
+	if storeItem.Id != idInt {
+		http.Error(w, "Item id must be same as path id", http.StatusBadRequest)
 		return
 	}
 	updated, er := db.UpdateItem(storeItem)
@@ -208,6 +224,7 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 //handlers
 func enableCors(w http.ResponseWriter) {
 	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:9090")
+	w.Header().Set("Access-Control-Allow-Methods", "PUT,POST,GET,DELETE,OPTIONS,PATCH")
 	appJson(w)
 }
 
@@ -335,7 +352,6 @@ func sendEmail(recipient, text string) error {
 
 func main() {
 	//sendEmail("galkin_kirill@mail.ru", "hello")
-	imageprocessing.Compress("./static/img/3/3_original.jpg", 40, "./static/img/3/3_short.webp")
 	db.InitDB("user=postgres password=N0coments dbname=northwindstoredb sslmode=disable")
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
@@ -344,11 +360,13 @@ func main() {
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static/"))))
 	router.HandleFunc("/api/items", getItems).Methods(http.MethodGet)
 	router.HandleFunc("/api/items", createItem).Methods(http.MethodPost)
+	router.HandleFunc("/api/items/{id}", updateItem).Methods(http.MethodPatch)
 	router.HandleFunc("/api/orders", createOrder).Methods(http.MethodPost)
 	router.HandleFunc("/api/items/{id}/uploadCoverImage", uploadFile).Methods(http.MethodPost)
 	router.HandleFunc("/api/tags", createTag).Methods(http.MethodPost)
 	router.HandleFunc("/api/tags", getTags).Methods(http.MethodGet)
 	router.HandleFunc("/api/menu", getMenu).Methods(http.MethodGet)
-	router.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./view/index.html") })
+	router.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) { enableCors(w) }).Methods(http.MethodOptions)
+	router.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./view/index.html") }).Methods(http.MethodGet)
 	log.Fatal(http.ListenAndServe("localhost:8080", router))
 }

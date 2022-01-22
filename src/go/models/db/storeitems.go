@@ -64,17 +64,41 @@ func UpdateItemCount(item OrderItem) error {
 }
 
 func UpdateItem(item StoreItem) (*StoreItem, error) {
-	_, er := db.Query(`UPDATE store_items SET data = $2,
+	er := checkTags(item.Tags)
+	if er != nil {
+		return nil, er
+	}
+	_, er = db.Query(`UPDATE store_items SET data = $2,
  	price = $3,
   	instock = $4,
   	tags = $5 
   	WHERE id = $1`,
 		item.Id, item.Data.String(), item.Price, item.InStock, pq.Array(item.Tags))
 	if er != nil {
-		log.Println(er)
-
+		return nil, er
 	}
 	return GetItem(item.Id)
+}
+
+func checkTags(tags []int64) error {
+	var result bool
+	allTags, er := GetTags()
+	if er != nil {
+		return er
+	}
+	for _, actTag := range tags {
+		result = false
+		for _, tag := range allTags {
+			if actTag == tag.Id {
+				result = true
+				break
+			}
+		}
+		if !result {
+			return errors.New(fmt.Sprintf("No tag found, id: %d", actTag))
+		}
+	}
+	return nil
 }
 
 func GetItem(id int64) (*StoreItem, error) {
@@ -99,6 +123,7 @@ func GetItem(id int64) (*StoreItem, error) {
 }
 
 func CreateItem(i StoreItem) (*StoreItem, error) {
+	err := checkTags(i.Tags)
 	rows, err := db.Query("INSERT INTO store_items (data, price, instock, tags) VALUES ($1, $2, $3, $4) returning *",
 		i.Data.String(), i.Price, i.InStock, pq.Array(i.Tags))
 	if err != nil {

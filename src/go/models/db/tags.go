@@ -8,7 +8,7 @@ import (
 
 type Tag struct {
 	Value string `json:"value"`
-	Id    int    `json:"id"`
+	Id    int64  `json:"id"`
 }
 
 func GetTags() ([]*Tag, error) {

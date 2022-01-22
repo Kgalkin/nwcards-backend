@@ -18,11 +18,11 @@ func Compress(originalPath string, quality int, newFilePath string) error {
 	if err != nil {
 		return err
 	}
-	rotated, err := bimg.NewImage(processed).Rotate(270)
+	/*rotated, err := bimg.NewImage(processed).Rotate(270)
 	if err != nil {
 		return err
-	}
-	err = bimg.Write(newFilePath, rotated)
+	}*/
+	err = bimg.Write(newFilePath, processed)
 	if err != nil {
 		return err
 	}
