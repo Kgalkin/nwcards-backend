@@ -24,9 +24,10 @@ import (
 //public routes
 func getItems(w http.ResponseWriter, r *http.Request) {
 	enableCors(w)
-	a, er := db.GetAllItems(r.URL.Query())
+	a, er := db.GetItems(r.URL.Query())
 	if er != nil {
-		fmt.Print(er)
+		http.Error(w, er.Error(), http.StatusInternalServerError)
+		return
 	}
 	resp, _ := json.Marshal(a)
 	fmt.Fprintf(w, string(resp))
@@ -221,6 +222,22 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func getOrders(w http.ResponseWriter, r *http.Request) {
+	enableCors(w)
+	appJson(w)
+	orders, err := db.GetOrders()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	resp, err := json.Marshal(orders)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Write(resp)
+}
+
 //handlers
 func enableCors(w http.ResponseWriter) {
 	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:9090")
@@ -352,6 +369,7 @@ func sendEmail(recipient, text string) error {
 
 func main() {
 	//sendEmail("galkin_kirill@mail.ru", "hello")
+
 	db.InitDB("user=postgres password=N0coments dbname=northwindstoredb sslmode=disable")
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
@@ -362,6 +380,7 @@ func main() {
 	router.HandleFunc("/api/items", createItem).Methods(http.MethodPost)
 	router.HandleFunc("/api/items/{id}", updateItem).Methods(http.MethodPatch)
 	router.HandleFunc("/api/orders", createOrder).Methods(http.MethodPost)
+	router.HandleFunc("/api/orders", getOrders).Methods(http.MethodGet)
 	router.HandleFunc("/api/items/{id}/uploadCoverImage", uploadFile).Methods(http.MethodPost)
 	router.HandleFunc("/api/tags", createTag).Methods(http.MethodPost)
 	router.HandleFunc("/api/tags", getTags).Methods(http.MethodGet)

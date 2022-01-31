@@ -13,6 +13,7 @@ func GetMenuItems() ([]*MenuItem, error) {
 	if er != nil {
 		return nil, er
 	}
+	defer rows.Close()
 	for rows.Next() {
 		item := new(MenuItem)
 		er = rows.Scan(&item.Name, pq.Array(&item.Tags))

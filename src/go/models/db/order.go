@@ -4,12 +4,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strconv"
 	"time"
 )
 
+type Timestamp time.Time
+
+func (t Timestamp) MarshalJSON() ([]byte, error) {
+	stamp := fmt.Sprintf("%d", time.Time(t).UnixMilli())
+	return []byte(stamp), nil
+}
+
 type Order struct {
 	Id      int       `json:"id"`
-	Created time.Time `json:"created"`
+	Created Timestamp `json:"created"`
 	State   string    `json:"state"`
 	Data    OrderData `json:"data"`
 }
@@ -34,10 +42,11 @@ type OrderData struct {
 type OrderItem struct {
 	Id    int64 `json:"id"`
 	Count int   `json:"count"`
+	Price int   `json:"price"`
 }
 
 func GetOrders() ([]*Order, error) {
-	rows, er := db.Query("SELECT * FROM orders")
+	rows, er := db.Query("SELECT * FROM orders ORDER BY created desc")
 	if er != nil {
 		log.Println(er)
 		return nil, er
@@ -60,8 +69,30 @@ func GetOrders() ([]*Order, error) {
 }
 
 func CreateOrder(order Order) error {
+	ids := ""
+	for i, item := range order.Data.Items {
+		if i > 0 {
+			ids += ","
+		}
+		ids += strconv.FormatInt(item.Id, 10)
+	}
+	items, er := GetItems(map[string][]string{"ids": {ids}})
+	if er != nil {
+		log.Println(er)
+		return er
+	}
+	for i, _ := range order.Data.Items {
+		item := &order.Data.Items[i]
+		for _, it := range items.Items {
+			if it.Id == item.Id {
+				item.Price = it.Price
+				break
+			}
+		}
+
+	}
 	data, _ := json.Marshal(order.Data)
-	_, er := db.Query("INSERT INTO orders (data) VALUES ($1)", data)
+	_, er = db.Exec("INSERT INTO orders (data) VALUES ($1)", data)
 	if er != nil {
 		log.Println(er)
 		return er

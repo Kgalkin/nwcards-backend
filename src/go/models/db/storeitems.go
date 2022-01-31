@@ -55,7 +55,7 @@ func UpdateItemCount(item OrderItem) error {
 		log.Println(er)
 		return er
 	}
-	_, er := db.Query("UPDATE store_items SET instock = instock - $1 WHERE id = $2", item.Count, item.Id)
+	_, er := db.Exec("UPDATE store_items SET instock = instock - $1 WHERE id = $2", item.Count, item.Id)
 	if er != nil {
 		log.Println(er)
 		return er
@@ -68,7 +68,7 @@ func UpdateItem(item StoreItem) (*StoreItem, error) {
 	if er != nil {
 		return nil, er
 	}
-	_, er = db.Query(`UPDATE store_items SET data = $2,
+	_, er = db.Exec(`UPDATE store_items SET data = $2,
  	price = $3,
   	instock = $4,
   	tags = $5 
@@ -107,8 +107,8 @@ func GetItem(id int64) (*StoreItem, error) {
 		log.Println(err)
 		return nil, err
 	}
-	item := new(StoreItem)
 	defer rows.Close()
+	item := new(StoreItem)
 	rows.Next()
 	err = rows.Scan(&item.Id, &item.Data, &item.Price, &item.InStock, pq.Array(&item.Tags))
 	if err != nil {
@@ -130,11 +130,12 @@ func CreateItem(i StoreItem) (*StoreItem, error) {
 		log.Println(err)
 		return nil, err
 	}
+	defer rows.Close()
 	items, err := rowsToStoreItems(rows)
 	return items[0], err
 }
 
-func GetAllItems(params map[string][]string) (*StoreItemsPage, error) {
+func GetItems(params map[string][]string) (*StoreItemsPage, error) {
 	query, whereQuery, offset := paramsToDbRequest(params)
 	rows, err := db.Query("SELECT * FROM store_items" +
 		query)
@@ -155,6 +156,7 @@ func GetAllItems(params map[string][]string) (*StoreItemsPage, error) {
 		log.Println(err)
 		return nil, err
 	}
+	defer countRow.Close()
 	countRow.Next()
 	err = countRow.Scan(&sip.TotalCount)
 	if err != nil {
@@ -192,6 +194,14 @@ func paramsToDbRequest(params map[string][]string) (string, string, int64) {
 			method = "@>"
 		}
 		where = fmt.Sprintf("\nWHERE tags %s '{%s}'", method, taglist[2:])
+	}
+	ids := params["ids"]
+	if len(ids) > 0 {
+		word := "WHERE"
+		if where != "" {
+			word = "AND"
+		}
+		where += fmt.Sprintf("\n%s id in (%s)", word, ids[0])
 	}
 	offsetInt, err := strconv.ParseInt(offset, 10, 64)
 	if err != nil {

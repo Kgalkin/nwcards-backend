@@ -17,6 +17,7 @@ func GetTags() ([]*Tag, error) {
 		log.Println(err)
 		return nil, err
 	}
+	defer rows.Close()
 	return readTags(rows)
 }
 
@@ -32,6 +33,7 @@ func CreateTags(tags []string) ([]*Tag, error) {
 		log.Println(err)
 		return nil, err
 	}
+	defer rows.Close()
 	return readTags(rows)
 }
 
