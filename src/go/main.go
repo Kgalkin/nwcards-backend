@@ -1,9 +1,12 @@
 package main
 
 import (
+	"NorthwindREST/src/go/email"
 	"NorthwindREST/src/go/imageprocessing"
 	"NorthwindREST/src/go/models/db"
-	"crypto/tls"
+	"NorthwindREST/src/go/props"
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/handlers"
@@ -11,14 +14,12 @@ import (
 	"io"
 	"log"
 	"mime/multipart"
-	"net"
 	"net/http"
-	"net/mail"
-	"net/smtp"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 //public routes
@@ -62,6 +63,7 @@ func getMenu(w http.ResponseWriter, r *http.Request) {
 
 func createOrder(w http.ResponseWriter, r *http.Request) {
 	enableCors(w)
+	appJson(w)
 	order := db.Order{}
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
@@ -75,10 +77,63 @@ func createOrder(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, er.Error(), http.StatusConflict)
 		}
 	}
-	if er = db.CreateOrder(order); er != nil {
+	created, er := db.CreateOrder(order)
+	if er != nil {
 		http.Error(w, er.Error(), http.StatusInternalServerError)
 	}
-	fmt.Fprintf(w, "Order created")
+	w.WriteHeader(http.StatusCreated)
+	fmt.Fprintf(w, "{\"uuid\": \"%s\"}", created.Uuid)
+	table, er := createTable(
+		"Заказ №", strconv.Itoa(created.Id),
+		"Ф.И.О", created.Data.Name,
+		"Адрес", created.Data.Address,
+		"Индекс", created.Data.Index,
+		"Способ доставки", created.Data.DeliveryOption.Description,
+		"Ссылка на заказ", fmt.Sprintf("<a href='http://%s/orders/%s'>NorthwindCards</a>", props.Get()["site.host"], created.Uuid))
+	if er != nil {
+		log.Println(er)
+		return
+	}
+	er = email.Send(created.Data.Email, "Новый заказ в магазине NorthwindCards", table)
+	if er != nil {
+		log.Printf("Error during sending created email %s\n", er.Error())
+		return
+	}
+	created.State = db.CREATED_EMAIL_SENT
+	_ = db.UpdateOrder(*created)
+}
+
+func createTable(args ...string) (string, error) {
+	if len(args)%2 != 0 {
+		return "", fmt.Errorf("Can not create table provided not paired args\n")
+	}
+	table := ""
+	for i := 0; i < len(args); i += 2 {
+		table += fmt.Sprintf("<tr><td>%s</td><td>%s</td></tr>", args[i], args[i+1])
+	}
+	return fmt.Sprintf("<table width=\"600\" style=\"border:1px solid #333\">%s</table>", table), nil
+}
+
+func viewOrderByUUID(w http.ResponseWriter, r *http.Request) {
+	enableCors(w)
+	appJson(w)
+	params := mux.Vars(r)
+	id := params["uuid"]
+	order, er := db.GetOrderByUUID(id)
+	if er != nil {
+		http.Error(w, er.Error(), http.StatusInternalServerError)
+		return
+	}
+	order.Data.Name = ""
+	order.Data.Address = ""
+	order.Data.Email = ""
+	order.Data.Index = ""
+	resp, er := json.Marshal(order)
+	if er != nil {
+		http.Error(w, er.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Write(resp)
 }
 
 //private
@@ -265,112 +320,21 @@ func makeDirAndSaveFile(file multipart.File, path string) error {
 	return nil
 }
 
-func send(body string) {
-	from := "a@gmail.com"
-	pass := "12345"
-	to := "foobarbazz@mailinator.com"
-
-	msg := "From: " + from + "\n" +
-		"To: " + to + "\n" +
-		"Subject: Hello there\n\n" +
-		body
-
-	err := smtp.SendMail("smtp.gmail.com:587",
-		smtp.PlainAuth("", from, pass, "smtp.gmail.com"),
-		from, []string{to}, []byte(msg))
-
-	if err != nil {
-		log.Printf("smtp error: %s", err)
-		return
-	}
-
-	log.Print("sent, visit http://foobarbazz.mailinator.com")
-}
-
-func sendEmail(recipient, text string) error {
-	from := mail.Address{"", "galkin_kirill@mail.ru"}
-	to := mail.Address{"", recipient}
-	subj := "This is the email subject"
-	body := "This is an example body.\n" + text
-
-	// Setup headers
-	headers := make(map[string]string)
-	headers["From"] = from.String()
-	headers["To"] = to.String()
-	headers["Subject"] = subj
-
-	// Setup message
-	message := ""
-	for k, v := range headers {
-		message += fmt.Sprintf("%s: %s\r\n", k, v)
-	}
-	message += "\r\n" + body
-
-	// Connect to the SMTP Server
-	servername := "smtp.mail.ru:465"
-
-	host, _, _ := net.SplitHostPort(servername)
-
-	auth := smtp.PlainAuth("", "galkin_kirill@mail.ru", "stop", host)
-
-	// TLS config
-	tlsconfig := &tls.Config{
-		InsecureSkipVerify: true,
-		ServerName:         host,
-	}
-
-	// Here is the key, you need to call tls.Dial instead of smtp.Dial
-	// for smtp servers running on 465 that require an ssl connection
-	// from the very beginning (no starttls)
-	conn, err := tls.Dial("tcp", servername, tlsconfig)
-	if err != nil {
-		log.Panic(err)
-	}
-
-	c, err := smtp.NewClient(conn, host)
-	if err != nil {
-		log.Panic(err)
-	}
-
-	defer c.Quit()
-
-	// Auth
-	if err = c.Auth(auth); err != nil {
-		log.Panic(err)
-	}
-
-	// To && From
-	if err = c.Mail(from.Address); err != nil {
-		log.Panic(err)
-	}
-
-	if err = c.Rcpt(to.Address); err != nil {
-		log.Panic(err)
-	}
-
-	// Data
-	w, err := c.Data()
-	if err != nil {
-		log.Panic(err)
-	}
-
-	_, err = w.Write([]byte(message))
-	if err != nil {
-		log.Panic(err)
-	}
-
-	err = w.Close()
-	if err != nil {
-		log.Panic(err)
-	}
-
-	return nil
+func sha256(str string) {
+	hasher := sha1.New()
+	hasher.Write([]byte(str))
+	hex.EncodeToString(hasher.Sum(nil))
 }
 
 func main() {
-	//sendEmail("galkin_kirill@mail.ru", "hello")
-
-	db.InitDB("user=postgres password=N0coments dbname=northwindstoredb sslmode=disable")
+	/*email.Send("galkin_kirill@mail.ru", "test",
+	"<table><tr><td>Hello world</td>"+fmt.Sprintf("<td><a href='http://%s/orders/%s'>NorthwindCards</a></td></tr></table>", props.Get()["site.host"], "1"))*/
+	go func() {
+		for i := 0; i < 10; i++ {
+			fmt.Println("time ticked")
+			time.Sleep(5 * time.Second)
+		}
+	}()
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	router := mux.NewRouter()
@@ -380,6 +344,7 @@ func main() {
 	router.HandleFunc("/api/items", createItem).Methods(http.MethodPost)
 	router.HandleFunc("/api/items/{id}", updateItem).Methods(http.MethodPatch)
 	router.HandleFunc("/api/orders", createOrder).Methods(http.MethodPost)
+	router.HandleFunc("/api/orders/{uuid}", viewOrderByUUID).Methods(http.MethodGet)
 	router.HandleFunc("/api/orders", getOrders).Methods(http.MethodGet)
 	router.HandleFunc("/api/items/{id}/uploadCoverImage", uploadFile).Methods(http.MethodPost)
 	router.HandleFunc("/api/tags", createTag).Methods(http.MethodPost)

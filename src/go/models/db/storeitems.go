@@ -21,12 +21,12 @@ type StoreItemData struct {
 	//Price       int    `json:"price"`
 }
 
-func (i *StoreItemData) Scan(src interface{}) error {
+func (id *StoreItemData) Scan(src interface{}) error {
 	uintVal, ok := src.([]uint8)
 	if !ok {
 		return fmt.Errorf("Data field must be a string, got #{src} instead")
 	}
-	return json.Unmarshal(uintVal, i)
+	return json.Unmarshal(uintVal, id)
 }
 
 type StoreItem struct {
@@ -43,8 +43,11 @@ type StoreItemsPage struct {
 	NextOffset int64        `json:"nextOffset"`
 }
 
-func (d StoreItemData) String() string {
-	s, _ := json.Marshal(d)
+func (id *StoreItemData) String() string {
+	s, er := json.Marshal(id)
+	if er != nil {
+		log.Print(er)
+	}
 	return string(s)
 }
 
@@ -211,7 +214,7 @@ func paramsToDbRequest(params map[string][]string) (string, string, int64) {
 	if err != nil {
 		panic(err)
 	}
-	return fmt.Sprintf("%s\nORDER BY id\nLIMIT %s\nOFFSET %s", where, limit, offset),
+	return fmt.Sprintf("%s\nORDER BY (instock > 0) desc, id\nLIMIT %s\nOFFSET %s", where, limit, offset),
 		where,
 		offsetInt + sizeInt
 }
