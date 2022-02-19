@@ -27,6 +27,7 @@ func getItems(w http.ResponseWriter, r *http.Request) {
 	enableCors(w)
 	a, er := db.GetItems(r.URL.Query())
 	if er != nil {
+		log.Println(er)
 		http.Error(w, er.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -39,6 +40,7 @@ func getTags(w http.ResponseWriter, r *http.Request) {
 	enableCors(w)
 	allTags, er := db.GetTags()
 	if er != nil {
+		log.Println(er)
 		http.Error(w, er.Error(), http.StatusBadRequest)
 		return
 	}
@@ -50,11 +52,13 @@ func getMenu(w http.ResponseWriter, r *http.Request) {
 	enableCors(w)
 	menuItems, er := db.GetMenuItems()
 	if er != nil {
+		log.Println(er)
 		http.Error(w, er.Error(), http.StatusBadRequest)
 		return
 	}
 	resp, er := json.Marshal(menuItems)
 	if er != nil {
+		log.Println(er)
 		http.Error(w, er.Error(), http.StatusBadRequest)
 		return
 	}
@@ -69,17 +73,22 @@ func createOrder(w http.ResponseWriter, r *http.Request) {
 	decoder.DisallowUnknownFields()
 	er := decoder.Decode(&order)
 	if er != nil {
+		log.Println(er)
 		http.Error(w, er.Error(), http.StatusBadRequest)
 		return
 	}
 	for _, item := range order.Data.Items {
 		if er = db.UpdateItemCount(item); er != nil {
+			log.Println(er)
 			http.Error(w, er.Error(), http.StatusConflict)
+			return
 		}
 	}
 	created, er := db.CreateOrder(order)
 	if er != nil {
+		log.Println(er)
 		http.Error(w, er.Error(), http.StatusInternalServerError)
+		return
 	}
 	w.WriteHeader(http.StatusCreated)
 	fmt.Fprintf(w, "{\"uuid\": \"%s\"}", created.Uuid)
@@ -121,6 +130,11 @@ func viewOrderByUUID(w http.ResponseWriter, r *http.Request) {
 	id := params["uuid"]
 	order, er := db.GetOrderByUUID(id)
 	if er != nil {
+		log.Println(er)
+		if strings.Contains(er.Error(), "Found 0") {
+			http.Error(w, er.Error(), http.StatusNotFound)
+			return
+		}
 		http.Error(w, er.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -130,6 +144,26 @@ func viewOrderByUUID(w http.ResponseWriter, r *http.Request) {
 	order.Data.Index = ""
 	resp, er := json.Marshal(order)
 	if er != nil {
+		log.Println(er)
+		http.Error(w, er.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Write(resp)
+}
+
+func getDeliveryOptions(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+	enableCors(w)
+	w.WriteHeader(200)
+	deliveryOptions, er := db.GetDeliveryOptions()
+	if er != nil {
+		log.Println(er)
+		http.Error(w, er.Error(), http.StatusInternalServerError)
+		return
+	}
+	resp, er := json.Marshal(deliveryOptions)
+	if er != nil {
+		log.Println(er)
 		http.Error(w, er.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -202,11 +236,13 @@ func updateItem(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	id := params["id"]
 	if len(id) != 1 {
+		log.Println("There should be 1 item id in request " + r.URL.Path)
 		http.Error(w, "There should be 1 item id in request "+r.URL.Path, http.StatusBadRequest)
 		return
 	}
 	idInt, er := strconv.ParseInt(id, 0, 64)
 	if er != nil {
+		log.Println(er)
 		http.Error(w, er.Error(), http.StatusBadRequest)
 		return
 	}
@@ -215,15 +251,18 @@ func updateItem(w http.ResponseWriter, r *http.Request) {
 	decoder.DisallowUnknownFields()
 	er = decoder.Decode(&storeItem)
 	if er != nil {
+		log.Println(er)
 		http.Error(w, er.Error(), http.StatusBadRequest)
 		return
 	}
 	if storeItem.Id != idInt {
+		log.Println(er)
 		http.Error(w, "Item id must be same as path id", http.StatusBadRequest)
 		return
 	}
 	updated, er := db.UpdateItem(storeItem)
 	if er != nil {
+		log.Println(er)
 		http.Error(w, er.Error(), http.StatusInternalServerError)
 	}
 	resp, _ := json.Marshal(updated)
@@ -238,17 +277,20 @@ func createTag(w http.ResponseWriter, r *http.Request) {
 	decoder.DisallowUnknownFields()
 	er := decoder.Decode(&tags)
 	if er != nil {
+		log.Println(er)
 		http.Error(w, er.Error(), http.StatusBadRequest)
 		return
 	}
 	allTags, er := db.CreateTags(*tags)
 	if er != nil {
+		log.Println(er)
 		http.Error(w, er.Error(), http.StatusBadRequest)
 		return
 	}
 	resp, _ := json.Marshal(allTags)
 	_, er = fmt.Fprintf(w, string(resp))
 	if er != nil {
+		log.Println(er)
 		http.Error(w, er.Error(), http.StatusBadRequest)
 		return
 	}
@@ -259,11 +301,13 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 	id := params["id"]
 	err := r.ParseMultipartForm(32 << 20) // limit your max input length!
 	if err != nil {
+		log.Println(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	file, header, err := r.FormFile("image")
 	if err != nil {
+		log.Println(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -272,6 +316,7 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 	err = makeDirAndSaveFile(file,
 		filepath.Join("static", "img", id, fmt.Sprintf("%s_cover.%s", id, name[1])))
 	if err != nil {
+		log.Println(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -282,11 +327,13 @@ func getOrders(w http.ResponseWriter, r *http.Request) {
 	appJson(w)
 	orders, err := db.GetOrders()
 	if err != nil {
+		log.Println(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	resp, err := json.Marshal(orders)
 	if err != nil {
+		log.Println(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -350,6 +397,7 @@ func main() {
 	router.HandleFunc("/api/tags", createTag).Methods(http.MethodPost)
 	router.HandleFunc("/api/tags", getTags).Methods(http.MethodGet)
 	router.HandleFunc("/api/menu", getMenu).Methods(http.MethodGet)
+	router.HandleFunc("/api/deliveryOptions", getDeliveryOptions).Methods(http.MethodGet)
 	router.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) { enableCors(w) }).Methods(http.MethodOptions)
 	router.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./view/index.html") }).Methods(http.MethodGet)
 	log.Fatal(http.ListenAndServe("localhost:8080", router))
