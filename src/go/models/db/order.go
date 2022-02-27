@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
 	"log"
 	"strconv"
 	"time"
@@ -15,17 +14,6 @@ type Timestamp time.Time
 func (t Timestamp) MarshalJSON() ([]byte, error) {
 	stamp := fmt.Sprintf("%d", time.Time(t).UnixMilli())
 	return []byte(stamp), nil
-}
-
-type Uuid struct {
-	uuid.UUID
-}
-
-func (u *Uuid) Scan(src interface{}) error {
-	if err := u.UnmarshalBinary(src.([]byte)); err != nil {
-		return err
-	}
-	return nil
 }
 
 type Order struct {
