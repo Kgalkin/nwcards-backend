@@ -98,7 +98,7 @@ func createOrder(w http.ResponseWriter, r *http.Request) {
 		"Адрес", created.Data.Address,
 		"Индекс", created.Data.Index,
 		"Способ доставки", created.Data.DeliveryOption.Description,
-		"Ссылка на заказ", fmt.Sprintf("<a href='http://%s/orders/%s'>NorthwindCards</a>", props.Get()["site.host"], created.Uuid))
+		"Ссылка на заказ", generateOrderLinc(created.Uuid))
 	if er != nil {
 		log.Println(er)
 		return
@@ -108,8 +108,15 @@ func createOrder(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error during sending created email %s\n", er.Error())
 		return
 	}
-	created.State = db.CREATED_EMAIL_SENT
-	_ = db.UpdateOrder(*created)
+	er = db.UpdateOrderStateData(created.Id, db.CREATED_EMAIL_SENT, nil)
+	if er != nil {
+		log.Printf("Error during sending created email %s\n", er.Error())
+		return
+	}
+}
+
+func generateOrderLinc(uuid string) string {
+	return fmt.Sprintf("<a href='http://%s/orders/%s'>NorthwindCards</a>", props.Get()["site.host"], uuid)
 }
 
 func createTable(args ...string) (string, error) {
@@ -172,6 +179,9 @@ func getDeliveryOptions(w http.ResponseWriter, r *http.Request) {
 
 //private
 func createItem(w http.ResponseWriter, r *http.Request) {
+	if !authChecker(w, r) {
+		return
+	}
 	defer r.Body.Close()
 	enableCors(w)
 	r.Header.Get("content-type")
@@ -232,6 +242,9 @@ func createItem(w http.ResponseWriter, r *http.Request) {
 }
 
 func updateItem(w http.ResponseWriter, r *http.Request) {
+	if !authChecker(w, r) {
+		return
+	}
 	enableCors(w)
 	params := mux.Vars(r)
 	id := params["id"]
@@ -270,6 +283,9 @@ func updateItem(w http.ResponseWriter, r *http.Request) {
 }
 
 func createTag(w http.ResponseWriter, r *http.Request) {
+	if !authChecker(w, r) {
+		return
+	}
 	defer r.Body.Close()
 	enableCors(w)
 	tags := new([]string)
@@ -297,6 +313,9 @@ func createTag(w http.ResponseWriter, r *http.Request) {
 }
 
 func uploadFile(w http.ResponseWriter, r *http.Request) {
+	if !authChecker(w, r) {
+		return
+	}
 	params := mux.Vars(r)
 	id := params["id"]
 	err := r.ParseMultipartForm(32 << 20) // limit your max input length!
@@ -323,6 +342,9 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 }
 
 func getOrders(w http.ResponseWriter, r *http.Request) {
+	if !authChecker(w, r) {
+		return
+	}
 	enableCors(w)
 	appJson(w)
 	orders, err := db.GetOrders()
@@ -340,10 +362,112 @@ func getOrders(w http.ResponseWriter, r *http.Request) {
 	w.Write(resp)
 }
 
+func updateOrder(w http.ResponseWriter, r *http.Request) {
+	if !authChecker(w, r) {
+		return
+	}
+	enableCors(w)
+	params := mux.Vars(r)
+	id := params["id"]
+	if len(id) < 0 {
+		log.Println("There no {id} parameter in request " + r.URL.Path)
+		http.Error(w, "There no {id} parameter in request "+r.URL.Path, http.StatusBadRequest)
+		return
+	}
+	idInt, er := strconv.Atoi(id)
+	if er != nil {
+		log.Println(er)
+		http.Error(w, er.Error(), http.StatusBadRequest)
+		return
+	}
+	patch := make(map[string]string)
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	er = decoder.Decode(&patch)
+	if er != nil {
+		log.Println(er)
+		http.Error(w, er.Error(), http.StatusBadRequest)
+		return
+	}
+	er = handlePatchOrder(idInt, patch)
+	if er != nil {
+		log.Println(er)
+		http.Error(w, er.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+func handlePatchOrder(id int, patch map[string]string) error {
+	advance := patch["advance"]
+	if len(advance) > 0 {
+		switch advance {
+		case "REVOKE":
+			er := db.RevokeOrder(id)
+			if er != nil {
+				log.Println(er)
+				return er
+			}
+		case "SET_DELIVERY_PRICE":
+			price, er := strconv.Atoi(patch["deliveryPrice"])
+			if er != nil {
+				log.Println(er)
+				return er
+			}
+			order, er := db.GetOrderById(id)
+			if er != nil {
+				log.Println(er)
+				return er
+			}
+			order.Data.DeliveryOption.Price = price
+			er = db.UpdateOrderStateData(id, "", &order.Data)
+			if er != nil {
+				log.Println(er)
+				return er
+			}
+			er = email.Send(order.Data.Email, "Стоимость доставки заказа обновлена", generateOrderLinc(order.Uuid))
+			if er != nil {
+				log.Println(er)
+			}
+		}
+	}
+	return nil
+}
+
+func login(w http.ResponseWriter, r *http.Request) {
+	enableCors(w)
+	if !authChecker(w, r) {
+		return
+	}
+	w.WriteHeader(200)
+}
+
 //handlers
+func authChecker(w http.ResponseWriter, r *http.Request) bool {
+	login, pss, ok := r.BasicAuth()
+	if !ok {
+		log.Println("Can not get basic auth")
+		http.Error(w, "Can not get basic auth", http.StatusUnauthorized)
+		return false
+	}
+	if login == "" || pss == "" {
+		log.Println("Login or password is empty")
+		http.Error(w, "Login or password is empty", http.StatusUnauthorized)
+		return false
+	}
+	prop := props.Get()
+	if login == prop["admin.login"] &&
+		pss == prop["admin.pss"] {
+		return true
+	}
+	log.Println("Login or password not correct")
+	http.Error(w, "Login or password not correct", http.StatusUnauthorized)
+	return false
+}
+
 func enableCors(w http.ResponseWriter) {
 	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:9090")
 	w.Header().Set("Access-Control-Allow-Methods", "PUT,POST,GET,DELETE,OPTIONS,PATCH")
+	w.Header().Set("Access-Control-Allow-Headers", "*")
 	appJson(w)
 }
 
@@ -392,11 +516,13 @@ func main() {
 	router.HandleFunc("/api/items/{id}", updateItem).Methods(http.MethodPatch)
 	router.HandleFunc("/api/orders", createOrder).Methods(http.MethodPost)
 	router.HandleFunc("/api/orders/{uuid}", viewOrderByUUID).Methods(http.MethodGet)
+	router.HandleFunc("/api/orders/{id}", updateOrder).Methods(http.MethodPatch)
 	router.HandleFunc("/api/orders", getOrders).Methods(http.MethodGet)
 	router.HandleFunc("/api/items/{id}/uploadCoverImage", uploadFile).Methods(http.MethodPost)
 	router.HandleFunc("/api/tags", createTag).Methods(http.MethodPost)
 	router.HandleFunc("/api/tags", getTags).Methods(http.MethodGet)
 	router.HandleFunc("/api/menu", getMenu).Methods(http.MethodGet)
+	router.HandleFunc("/api/login", login).Methods(http.MethodGet)
 	router.HandleFunc("/api/deliveryOptions", getDeliveryOptions).Methods(http.MethodGet)
 	router.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) { enableCors(w) }).Methods(http.MethodOptions)
 	router.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./view/index.html") }).Methods(http.MethodGet)

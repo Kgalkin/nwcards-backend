@@ -76,7 +76,19 @@ const (
 	PAYMENT_RECEIVED            = "payment_received"
 	PAYMENT_RECEIVED_EMAIL_SENT = "payment_received(email_sent)"
 	SENT_TO_CUSTOMER            = "sent_to_customer"
+	COMPLETED                   = "completed"
+	CANCELED                    = "canceled"
 )
+
+func getStates() []string {
+	return []string{CREATED,
+		CREATED_EMAIL_SENT,
+		PAYMENT_RECEIVED,
+		PAYMENT_RECEIVED_EMAIL_SENT,
+		SENT_TO_CUSTOMER,
+		COMPLETED,
+		CANCELED}
+}
 
 func GetOrders() ([]*Order, error) {
 	rows, er := db.Query("SELECT * FROM orders ORDER BY created desc")
@@ -88,12 +100,84 @@ func GetOrders() ([]*Order, error) {
 	return readOrders(rows)
 }
 
-func UpdateOrder(order Order) error {
-	_, er := db.Exec("UPDATE orders SET data = $1, state = $2 WHERE id = $3", order.Data.String(), order.State, order.Id)
+func RevokeOrder(id int) error {
+	order, er := GetOrderById(id)
+	if order.State == CANCELED ||
+		order.State == COMPLETED ||
+		order.State == SENT_TO_CUSTOMER {
+		return fmt.Errorf("Order in state %s can not be revoked\n", order.State)
+	}
 	if er != nil {
-		fmt.Println(er.Error())
+		log.Println(er)
+		return er
+	}
+	updateItems := ""
+	lastICount := len(order.Data.Items) - 1
+	for i, it := range order.Data.Items {
+		updateItems += fmt.Sprintf("(%d, %d)", it.Id, it.Count)
+		if i != lastICount {
+			updateItems += ",\n"
+		}
+	}
+	_, er = db.Exec(fmt.Sprintf(`update store_items as si set
+				inStock = inStock + c.addInStock
+				from (values
+          			%s
+     			) as c(id, addInStock)
+			where c.id = si.id;`, updateItems))
+	if er != nil {
+		log.Println(er)
+		return er
+	}
+	er = UpdateOrderStateData(id, CANCELED, nil)
+	if er != nil {
+		log.Println(er)
+		return er
+	}
+	return nil
+}
+
+func UpdateOrder(id int, query string) error {
+	_, er := db.Exec("UPDATE orders set "+query+" WHERE id = $1", id)
+	if er != nil {
+		log.Println(er.Error())
+		return er
 	}
 	return er
+}
+
+func UpdateOrderStateData(id int, state string, data *OrderData) error {
+	update := ""
+	if len(state) > 0 {
+		if er := checkState(state); er != nil {
+			log.Println(er)
+			return er
+		}
+		update += fmt.Sprintf("state = '%s'", state)
+	}
+	if data != nil {
+		if len(update) > 0 {
+			update += ", "
+		}
+		update += fmt.Sprintf("data = '%s'", data.String())
+	}
+	if len(update) > 0 && id > 0 {
+		_, er := db.Exec("UPDATE orders SET "+update+" WHERE id = $1", id)
+		if er != nil {
+			log.Println(er)
+			return er
+		}
+	}
+	return nil
+}
+
+func checkState(state string) error {
+	for _, st := range getStates() {
+		if st == state {
+			return nil
+		}
+	}
+	return fmt.Errorf("Unknown state: %s\n", state)
 }
 
 func readOrders(rows *sql.Rows) ([]*Order, error) {
@@ -112,6 +196,26 @@ func readOrders(rows *sql.Rows) ([]*Order, error) {
 		return nil, er
 	}
 	return orders, nil
+}
+
+func GetOrderById(id int) (*Order, error) {
+	rows, er := db.Query("SELECT * FROM orders where id = $1", id)
+	if er != nil {
+		log.Println(er)
+		return nil, er
+	}
+	defer rows.Close()
+	orders, er := readOrders(rows)
+	if er != nil {
+		log.Println(er)
+		return nil, er
+	}
+	if len(orders) != 1 {
+		er := fmt.Errorf("Found %d orders with id: %s\n", len(orders), id)
+		log.Println(er)
+		return nil, er
+	}
+	return orders[0], nil
 }
 
 func GetOrderByUUID(uuid string) (*Order, error) {
