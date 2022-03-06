@@ -248,7 +248,7 @@ func updateItem(w http.ResponseWriter, r *http.Request) {
 	enableCors(w)
 	params := mux.Vars(r)
 	id := params["id"]
-	if len(id) != 1 {
+	if len(id) == 0 {
 		log.Println("There should be 1 item id in request " + r.URL.Path)
 		http.Error(w, "There should be 1 item id in request "+r.URL.Path, http.StatusBadRequest)
 		return
@@ -465,10 +465,10 @@ func authChecker(w http.ResponseWriter, r *http.Request) bool {
 }
 
 func enableCors(w http.ResponseWriter) {
-	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:9090")
+	/*w.Header().Set("Access-Control-Allow-Origin", "http://localhost:9090")
 	w.Header().Set("Access-Control-Allow-Methods", "PUT,POST,GET,DELETE,OPTIONS,PATCH")
 	w.Header().Set("Access-Control-Allow-Headers", "*")
-	appJson(w)
+	appJson(w)*/
 }
 
 func appJson(w http.ResponseWriter) {
@@ -526,5 +526,5 @@ func main() {
 	router.HandleFunc("/api/deliveryOptions", getDeliveryOptions).Methods(http.MethodGet)
 	router.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) { enableCors(w) }).Methods(http.MethodOptions)
 	router.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./view/index.html") }).Methods(http.MethodGet)
-	log.Fatal(http.ListenAndServe("localhost:8080", router))
+	log.Fatal(http.ListenAndServe("192.168.0.104:8080", router))
 }
