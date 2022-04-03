@@ -4,9 +4,8 @@ import (
 	"NorthwindREST/src/go/email"
 	"NorthwindREST/src/go/imageprocessing"
 	"NorthwindREST/src/go/models/db"
+	"NorthwindREST/src/go/payments"
 	"NorthwindREST/src/go/props"
-	"crypto/sha1"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/handlers"
@@ -116,7 +115,7 @@ func createOrder(w http.ResponseWriter, r *http.Request) {
 }
 
 func generateOrderLinc(uuid string) string {
-	return fmt.Sprintf("<a href='http://%s/orders/%s'>NorthwindCards</a>", props.Get()["site.host"], uuid)
+	return fmt.Sprintf("<a href='http://%s/orders/%s'>NorthwindCards</a>", props.Get()["site.host"].(string), uuid)
 }
 
 func createTable(args ...string) (string, error) {
@@ -175,6 +174,58 @@ func getDeliveryOptions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Write(resp)
+}
+
+func requestPayment(w http.ResponseWriter, r *http.Request) {
+	enableCors(w)
+	params := mux.Vars(r)
+	id := params["id"]
+	if len(id) == 0 {
+		er := fmt.Errorf("No {id} in path parameter: ")
+		log.Println(er)
+		http.Error(w, er.Error(), http.StatusBadRequest)
+		return
+	}
+	intId, er := strconv.Atoi(id)
+	if er != nil {
+		log.Println(er)
+		http.Error(w, er.Error(), http.StatusBadRequest)
+		return
+	}
+	order, er := db.GetOrderById(intId)
+	if er != nil {
+		log.Println(er)
+		http.Error(w, er.Error(), http.StatusNotFound)
+		return
+	}
+	initRequest := payments.NewInitForm(*order)
+	response, er := payments.RequestLink(*initRequest)
+	if er != nil {
+		log.Println(er)
+		http.Error(w, er.Error(), http.StatusInternalServerError)
+		return
+	}
+	if !response.Success {
+		er = fmt.Errorf("Something went wrong with link request, order %s, errorCode %s\n", response.OrderId, response.ErrorCode)
+		log.Println(er, response.Message)
+		http.Error(w, er.Error(), http.StatusInternalServerError)
+		return
+	}
+	order.Data.PaymentLink = response.PaymentURL
+	orderDataJson, er := json.Marshal(order.Data)
+	if er != nil {
+		log.Println(er)
+		log.Println("Error saving payment details to DB, Token:  " + initRequest.Token +
+			" payment_link: " + response.PaymentURL)
+	}
+	er = db.UpdateOrder(order.Id, fmt.Sprintf("token = '%s', data = '%s'",
+		initRequest.Token, string(orderDataJson)))
+	if er != nil {
+		log.Println(er)
+		log.Println("Error saving payment details to DB, Token:  " + initRequest.Token +
+			" payment_link: " + response.PaymentURL)
+	}
+	w.Write([]byte(fmt.Sprintf("{\"link\": \"%s\"}", response.PaymentURL)))
 }
 
 //private
@@ -465,10 +516,12 @@ func authChecker(w http.ResponseWriter, r *http.Request) bool {
 }
 
 func enableCors(w http.ResponseWriter) {
-	/*w.Header().Set("Access-Control-Allow-Origin", "http://localhost:9090")
-	w.Header().Set("Access-Control-Allow-Methods", "PUT,POST,GET,DELETE,OPTIONS,PATCH")
-	w.Header().Set("Access-Control-Allow-Headers", "*")
-	appJson(w)*/
+	if props.Get()["api.cors.enabled"].(bool) {
+		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:9090")
+		w.Header().Set("Access-Control-Allow-Methods", "PUT,POST,GET,DELETE,OPTIONS,PATCH")
+		w.Header().Set("Access-Control-Allow-Headers", "*")
+	}
+	appJson(w)
 }
 
 func appJson(w http.ResponseWriter) {
@@ -491,15 +544,33 @@ func makeDirAndSaveFile(file multipart.File, path string) error {
 	return nil
 }
 
-func sha256(str string) {
-	hasher := sha1.New()
-	hasher.Write([]byte(str))
-	hex.EncodeToString(hasher.Sum(nil))
+func handlePayment(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+	w.WriteHeader(200)
+	paymentResponse := payments.PaymentResponse{}
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	er := decoder.Decode(&paymentResponse)
+	str, _ := json.Marshal(paymentResponse)
+	log.Println("Received payment response: " + string(str))
+	if er != nil {
+		log.Println(er)
+		return
+	}
+	if paymentResponse.Success && paymentResponse.Status == "CONFIRMED" {
+		orderId, er := strconv.Atoi(paymentResponse.OrderID)
+		if er != nil {
+			log.Println(er)
+			return
+		}
+		er = db.UpdateOrderStateData(orderId, db.PAYMENT_RECEIVED, nil)
+		if er != nil {
+			log.Println(er)
+		}
+	}
 }
 
 func main() {
-	/*email.Send("galkin_kirill@mail.ru", "test",
-	"<table><tr><td>Hello world</td>"+fmt.Sprintf("<td><a href='http://%s/orders/%s'>NorthwindCards</a></td></tr></table>", props.Get()["site.host"], "1"))*/
 	go func() {
 		for i := 0; i < 10; i++ {
 			fmt.Println("time ticked")
@@ -517,6 +588,7 @@ func main() {
 	router.HandleFunc("/api/orders", createOrder).Methods(http.MethodPost)
 	router.HandleFunc("/api/orders/{uuid}", viewOrderByUUID).Methods(http.MethodGet)
 	router.HandleFunc("/api/orders/{id}", updateOrder).Methods(http.MethodPatch)
+	router.HandleFunc("/api/orders/{id}/requestPayment", requestPayment).Methods(http.MethodGet)
 	router.HandleFunc("/api/orders", getOrders).Methods(http.MethodGet)
 	router.HandleFunc("/api/items/{id}/uploadCoverImage", uploadFile).Methods(http.MethodPost)
 	router.HandleFunc("/api/tags", createTag).Methods(http.MethodPost)
@@ -524,7 +596,8 @@ func main() {
 	router.HandleFunc("/api/menu", getMenu).Methods(http.MethodGet)
 	router.HandleFunc("/api/login", login).Methods(http.MethodGet)
 	router.HandleFunc("/api/deliveryOptions", getDeliveryOptions).Methods(http.MethodGet)
+	router.HandleFunc("/api/handlepaymentresult", handlePayment)
 	router.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) { enableCors(w) }).Methods(http.MethodOptions)
 	router.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./view/index.html") }).Methods(http.MethodGet)
-	log.Fatal(http.ListenAndServe("192.168.0.104:8080", router))
+	log.Fatal(http.ListenAndServe(props.Get()["api.host.address"].(string), router))
 }

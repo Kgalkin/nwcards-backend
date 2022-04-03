@@ -15,8 +15,8 @@ var pass string
 
 func init() {
 	props := props.Get()
-	from = props["email.login"]
-	pass = props["email.password"]
+	from = props["company.email"].(string)
+	pass = props["email.password"].(string)
 }
 
 func Send(to string, subject string, body string) error {

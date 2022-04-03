@@ -10,8 +10,8 @@ var db *sql.DB
 
 func init() {
 	props := props.Get()
-	dataSource := fmt.Sprintf("host = %s user=%s password=%s dbname=%s",
-		props["db.host"], props["db.user"], props["db.pass"], props["db.name"])
+	dataSource := fmt.Sprintf("host = %s user=%s password=%s dbname=%s%s",
+		props["db.host"], props["db.user"], props["db.pass"], props["db.name"], props["db.additional.props"])
 	var err error
 	db, err = sql.Open("postgres", dataSource)
 	if err != nil {

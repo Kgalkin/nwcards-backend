@@ -6,13 +6,13 @@ import (
 	"os"
 )
 
-func Get() map[string]string {
+func Get() map[string]interface{} {
 	file, err := os.Open("./props.json")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer file.Close()
-	var data map[string]string
+	var data map[string]interface{}
 	if err := json.NewDecoder(file).Decode(&data); err != nil {
 		log.Fatal(err)
 	}

@@ -33,6 +33,7 @@ type OrderData struct {
 	DeliveryOption DeliveryOption `json:"deliveryOption"`
 	PostalTrack    string         `json:"postalTrack"`
 	Items          []OrderItem    `json:"items"`
+	PaymentLink    string         `json:"payment_link"`
 }
 
 func (od *OrderData) Scan(src interface{}) error {
@@ -59,20 +60,18 @@ type OrderItem struct {
 }
 
 const (
-	CREATED                     = "created"
-	CREATED_EMAIL_SENT          = "created(email_sent)"
-	PAYMENT_RECEIVED            = "payment_received"
-	PAYMENT_RECEIVED_EMAIL_SENT = "payment_received(email_sent)"
-	SENT_TO_CUSTOMER            = "sent_to_customer"
-	COMPLETED                   = "completed"
-	CANCELED                    = "canceled"
+	CREATED            = "created"
+	CREATED_EMAIL_SENT = "created(email_sent)"
+	PAYMENT_RECEIVED   = "payment_received"
+	SENT_TO_CUSTOMER   = "sent_to_customer"
+	COMPLETED          = "completed"
+	CANCELED           = "canceled"
 )
 
 func getStates() []string {
 	return []string{CREATED,
 		CREATED_EMAIL_SENT,
 		PAYMENT_RECEIVED,
-		PAYMENT_RECEIVED_EMAIL_SENT,
 		SENT_TO_CUSTOMER,
 		COMPLETED,
 		CANCELED}
