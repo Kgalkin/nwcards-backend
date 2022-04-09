@@ -206,8 +206,8 @@ func requestPayment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !response.Success {
-		er = fmt.Errorf("Something went wrong with link request, order %s, errorCode %s\n", response.OrderId, response.ErrorCode)
-		log.Println(er, response.Message)
+		er = fmt.Errorf("Something went wrong with link request, order %d, errorCode %s\n", intId, response.ErrorCode)
+		log.Println(er, response.Message, response.Details)
 		http.Error(w, er.Error(), http.StatusInternalServerError)
 		return
 	}
