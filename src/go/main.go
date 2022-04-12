@@ -1,11 +1,6 @@
 package main
 
 import (
-	"NorthwindREST/src/go/email"
-	"NorthwindREST/src/go/imageprocessing"
-	"NorthwindREST/src/go/models/db"
-	"NorthwindREST/src/go/payments"
-	"NorthwindREST/src/go/props"
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/handlers"
@@ -14,6 +9,11 @@ import (
 	"log"
 	"mime/multipart"
 	"net/http"
+	"nwcards-backend/src/go/email"
+	"nwcards-backend/src/go/imageprocessing"
+	"nwcards-backend/src/go/models/db"
+	"nwcards-backend/src/go/payments"
+	"nwcards-backend/src/go/props"
 	"os"
 	"path/filepath"
 	"strconv"

@@ -1,11 +1,11 @@
 package payments
 
 import (
-	"NorthwindREST/src/go/models/db"
-	"NorthwindREST/src/go/props"
 	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
+	"nwcards-backend/src/go/models/db"
+	"nwcards-backend/src/go/props"
 	"strconv"
 	"time"
 )

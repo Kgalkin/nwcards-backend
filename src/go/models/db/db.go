@@ -1,9 +1,9 @@
 package db
 
 import (
-	"NorthwindREST/src/go/props"
 	"database/sql"
 	"fmt"
+	"nwcards-backend/src/go/props"
 )
 
 var db *sql.DB

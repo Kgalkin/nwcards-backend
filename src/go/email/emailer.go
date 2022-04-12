@@ -1,13 +1,13 @@
 package email
 
 import (
-	"NorthwindREST/src/go/props"
 	"crypto/tls"
 	"fmt"
 	"log"
 	"net"
 	"net/mail"
 	"net/smtp"
+	"nwcards-backend/src/go/props"
 )
 
 var from string
