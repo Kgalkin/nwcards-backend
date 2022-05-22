@@ -31,9 +31,14 @@ type OrderData struct {
 	Address        string         `json:"address"`
 	Name           string         `json:"name"`
 	DeliveryOption DeliveryOption `json:"deliveryOption"`
-	PostalTrack    string         `json:"postalTrack"`
+	PostalCode     string         `json:"postalCode"`
 	Items          []OrderItem    `json:"items"`
 	PaymentLink    string         `json:"payment_link"`
+}
+
+type Error struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
 }
 
 func (od *OrderData) Scan(src interface{}) error {

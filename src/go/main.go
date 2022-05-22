@@ -97,7 +97,7 @@ func createOrder(w http.ResponseWriter, r *http.Request) {
 		"Адрес", created.Data.Address,
 		"Индекс", created.Data.Index,
 		"Способ доставки", created.Data.DeliveryOption.Description,
-		"Ссылка на заказ", generateOrderLinc(created.Uuid))
+		"Ссылка на заказ", generateOrderLinc(created.Uuid, "NorthwindCards"))
 	if er != nil {
 		log.Println(er)
 		return
@@ -114,8 +114,8 @@ func createOrder(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func generateOrderLinc(uuid string) string {
-	return fmt.Sprintf("<a href='http://%s/orders/%s'>NorthwindCards</a>", props.Get()["site.host"].(string), uuid)
+func generateOrderLinc(uuid string, text string) string {
+	return fmt.Sprintf("<a href='http://%s/orders/%s'>%s</a>", props.Get()["site.host"].(string), uuid, text)
 }
 
 func createTable(args ...string) (string, error) {
@@ -475,10 +475,42 @@ func handlePatchOrder(id int, patch map[string]string) error {
 				log.Println(er)
 				return er
 			}
-			er = email.Send(order.Data.Email, "Стоимость доставки заказа обновлена", generateOrderLinc(order.Uuid))
+			er = email.Send(order.Data.Email, "Стоимость доставки заказа обновлена",
+				generateOrderLinc(order.Uuid, "NorthwindCards"))
 			if er != nil {
 				log.Println(er)
 			}
+		case "SENT_CODE":
+			postalCode := patch["postalCode"]
+			if len(postalCode) == 0 {
+				er := fmt.Errorf("SENT advance for order: %d but no postalCode found!\n", id)
+				log.Println(er)
+				return er
+			}
+			order, er := db.GetOrderById(id)
+			if er != nil {
+				log.Println(er)
+				return er
+			}
+			if order.State != db.PAYMENT_RECEIVED {
+				er = fmt.Errorf("SENT advance for order: %d but order state != %s\n", id, db.PAYMENT_RECEIVED)
+				return er
+			}
+			order.Data.PostalCode = postalCode
+			er = db.UpdateOrderStateData(id, db.SENT_TO_CUSTOMER, &order.Data)
+			if er != nil {
+				log.Println(er)
+				return er
+			}
+			er = email.Send(order.Data.Email,
+				fmt.Sprintf("ваш заказ отправлен из магазина %s", props.Get()["site.host"].(string)),
+				fmt.Sprintf(
+					`Здравствуйте! Ваш %[1]s из магазина North Wind Cards отправлен. 
+Вы можете отслеживать отправку с помощью трекера на <a href="https://www.pochta.ru/tracking#%[2]s">сайте Почты России</a> или в приложении Почты России. 
+Попутного ветра!
+%[2]s`,
+					generateOrderLinc(order.Uuid, "заказ"),
+					postalCode))
 		}
 	}
 	return nil
