@@ -612,7 +612,8 @@ func handlePayment(w http.ResponseWriter, r *http.Request) {
 func authMiddleware(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.RemoteAddr, "79.120.11.119") ||
-			strings.Contains(r.RemoteAddr, "127.0.0.1") {
+			strings.Contains(r.RemoteAddr, "127.0.0.1") ||
+			strings.Contains(r.URL.Path, "/api/handlepaymentresult") {
 			next.ServeHTTP(w, r)
 		} else {
 			http.Error(w, "No permissions", http.StatusUnauthorized)
