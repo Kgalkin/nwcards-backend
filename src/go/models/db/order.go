@@ -23,6 +23,7 @@ type Order struct {
 	Data    OrderData `json:"data"`
 	Uuid    string    `json:"uuid"`
 	Token   []byte    `json:"token"`
+	Error   Error     `json:"error"`
 }
 
 type OrderData struct {
@@ -37,6 +38,10 @@ type OrderData struct {
 }
 
 type Error struct {
+	/*
+		codes:
+		1 - Create order email not sent;
+	*/
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 }
@@ -65,17 +70,15 @@ type OrderItem struct {
 }
 
 const (
-	CREATED            = "created"
-	CREATED_EMAIL_SENT = "created(email_sent)"
-	PAYMENT_RECEIVED   = "payment_received"
-	SENT_TO_CUSTOMER   = "sent_to_customer"
-	COMPLETED          = "completed"
-	CANCELED           = "canceled"
+	CREATED          = "created"
+	PAYMENT_RECEIVED = "payment_received"
+	SENT_TO_CUSTOMER = "sent_to_customer"
+	COMPLETED        = "completed"
+	CANCELED         = "canceled"
 )
 
 func getStates() []string {
 	return []string{CREATED,
-		CREATED_EMAIL_SENT,
 		PAYMENT_RECEIVED,
 		SENT_TO_CUSTOMER,
 		COMPLETED,
@@ -176,7 +179,7 @@ func readOrders(rows *sql.Rows) ([]*Order, error) {
 	orders := make([]*Order, 0)
 	for rows.Next() {
 		order := new(Order)
-		er := rows.Scan(&order.Id, &order.Data, &order.State, &order.Created, &order.Token, &order.Uuid)
+		er := rows.Scan(&order.Id, &order.Data, &order.State, &order.Created, &order.Token, &order.Uuid, &order.Error)
 		if er != nil {
 			log.Println(er)
 			return nil, er

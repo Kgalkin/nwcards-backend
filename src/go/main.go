@@ -91,6 +91,10 @@ func createOrder(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusCreated)
 	fmt.Fprintf(w, "{\"uuid\": \"%s\"}", created.Uuid)
+	text := `Здравствуйте! Вы сделали заказ в магазине North Wind Cards. Срок сборки и отправки заказа после оплаты 3-5 дней. Мы пришлем Вам трекер либо фото конверта, готового к отправке, если выбрана доставка простым письмом.<br><br>
+Посмотреть и оплатить заказ вы можете по ссылке.<br><br>
+Спасибо за заказ!<br><br>
+Ева Северный Ветер`
 	table, er := createTable(
 		"Заказ №", strconv.Itoa(created.Id),
 		"Ф.И.О", created.Data.Name,
@@ -98,18 +102,21 @@ func createOrder(w http.ResponseWriter, r *http.Request) {
 		"Индекс", created.Data.Index,
 		"Способ доставки", created.Data.DeliveryOption.Description,
 		"Ссылка на заказ", generateOrderLinc(created.Uuid, "NorthwindCards"))
-	if er != nil {
-		log.Println(er)
-		return
+	if er == nil {
+		er = email.Send(created.Data.Email, "Новый заказ в магазине NorthwindCards", text+table)
 	}
-	er = email.Send(created.Data.Email, "Новый заказ в магазине NorthwindCards", table)
 	if er != nil {
-		log.Printf("Error during sending created email %s\n", er.Error())
-		return
-	}
-	er = db.UpdateOrderStateData(created.Id, db.CREATED_EMAIL_SENT, nil)
-	if er != nil {
-		log.Printf("Error during sending created email %s\n", er.Error())
+		log.Printf("Error during sending CREATED email %s\n", er)
+		error := db.Error{Code: 1, Message: fmt.Sprintln(er)}
+		stringErr, err := json.Marshal(error)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		err = db.UpdateOrder(order.Id, fmt.Sprintf("error = '%s'", string(stringErr)))
+		if err != nil {
+			log.Println(err)
+		}
 		return
 	}
 }
@@ -602,6 +609,18 @@ func handlePayment(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func authMiddleware(next http.Handler) http.Handler {
+	fn := func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.RemoteAddr, "79.120.11.119") ||
+			strings.Contains(r.RemoteAddr, "127.0.0.1") {
+			next.ServeHTTP(w, r)
+		} else {
+			http.Error(w, "No permissions", http.StatusUnauthorized)
+		}
+	}
+	return http.HandlerFunc(fn)
+}
+
 func main() {
 	go func() {
 		for i := 0; i < 10; i++ {
@@ -612,6 +631,7 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	router := mux.NewRouter()
+	router.Use(authMiddleware)
 	router.Use(func(next http.Handler) http.Handler { return handlers.LoggingHandler(os.Stdout, next) })
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static/"))))
 	router.HandleFunc("/api/items", getItems).Methods(http.MethodGet)
