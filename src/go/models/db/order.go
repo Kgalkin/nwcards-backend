@@ -49,7 +49,7 @@ type Error struct {
 func (od *Error) Scan(src interface{}) error {
 	val, ok := src.([]uint8)
 	if !ok {
-		return fmt.Errorf("Error field must be a string, got #{src} instead\n")
+		return nil
 	}
 	return json.Unmarshal(val, od)
 }
