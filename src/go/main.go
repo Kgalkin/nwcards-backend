@@ -76,6 +76,7 @@ func createOrder(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, er.Error(), http.StatusBadRequest)
 		return
 	}
+	order.Data.Email = strings.TrimSpace(order.Data.Email)
 	for _, item := range order.Data.Items {
 		if er = db.UpdateItemCount(item); er != nil {
 			log.Println(er)
