@@ -7,6 +7,7 @@ import (
 	"github.com/gorilla/mux"
 	"io"
 	"log"
+	"math/rand"
 	"mime/multipart"
 	"net/http"
 	"nwcards-backend/src/go/email"
@@ -246,51 +247,29 @@ func createItem(w http.ResponseWriter, r *http.Request) {
 	r.Header.Get("content-type")
 	er := r.ParseMultipartForm(32 << 20) // limit your max input length!
 	if er != nil {
-		fmt.Println(er.Error())
+		log.Println(er.Error())
 		http.Error(w, er.Error(), http.StatusBadRequest)
 		return
 	}
 	item := db.StoreItem{}
 	er = json.Unmarshal([]byte(r.FormValue("data")), &item)
 	if er != nil {
-		fmt.Println(er.Error())
+		log.Println(er.Error())
 		http.Error(w, er.Error(), http.StatusBadRequest)
 		return
 	}
 	files := r.MultipartForm.File["image"]
 	var items []db.StoreItem
 	for _, file := range files {
-		f, er := file.Open()
-		if er != nil {
-			fmt.Println(er.Error())
-			http.Error(w, er.Error(), http.StatusBadRequest)
-			return
-		}
 		i, er := db.CreateItem(item)
 		if er != nil {
-			fmt.Println(er.Error())
+			log.Println(er.Error())
 			http.Error(w, er.Error(), http.StatusBadRequest)
 			return
 		}
-		filePathOriginal := fmt.Sprintf("./static/img/%[1]d/%[1]d_original.%[2]s", i.Id, strings.Split(file.Filename, ".")[1])
-		filePathShort := fmt.Sprintf("./static/img/%[1]d/%[1]d_short.webp", i.Id, strings.Split(file.Filename, ".")[1])
-		er = makeDirAndSaveFile(f, filePathOriginal)
+		er = saveCoverImage(file, i)
 		if er != nil {
-			fmt.Println(er.Error())
-			http.Error(w, er.Error(), http.StatusBadRequest)
-			return
-		}
-		i.Data.Links.Original = filePathOriginal
-		i.Data.Links.Short = filePathShort
-		er = imageprocessing.Compress(filePathOriginal, 40, filePathShort)
-		if er != nil {
-			fmt.Println(er.Error())
-			http.Error(w, er.Error(), http.StatusBadRequest)
-			return
-		}
-		_, er = db.UpdateItem(*i)
-		if er != nil {
-			fmt.Println(er.Error())
+			log.Println(er.Error())
 			http.Error(w, er.Error(), http.StatusBadRequest)
 			return
 		}
@@ -305,14 +284,7 @@ func updateItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	enableCors(w)
-	params := mux.Vars(r)
-	id := params["id"]
-	if len(id) == 0 {
-		log.Println("There should be 1 item id in request " + r.URL.Path)
-		http.Error(w, "There should be 1 item id in request "+r.URL.Path, http.StatusBadRequest)
-		return
-	}
-	idInt, er := strconv.ParseInt(id, 0, 64)
+	idInt, er := parseId(r)
 	if er != nil {
 		log.Println(er)
 		http.Error(w, er.Error(), http.StatusBadRequest)
@@ -338,6 +310,58 @@ func updateItem(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, er.Error(), http.StatusInternalServerError)
 	}
 	resp, _ := json.Marshal(updated)
+	fmt.Fprintf(w, string(resp))
+}
+
+func updateCoverImage(w http.ResponseWriter, r *http.Request) {
+	if !authChecker(w, r) {
+		return
+	}
+	defer r.Body.Close()
+	enableCors(w)
+	er := r.ParseMultipartForm(32 << 20) // limit your max input length!
+	if er != nil {
+		log.Println(er)
+		http.Error(w, er.Error(), http.StatusBadRequest)
+		return
+	}
+	id, er := parseId(r)
+	if er != nil {
+		log.Println(er)
+		http.Error(w, er.Error(), http.StatusBadRequest)
+		return
+	}
+	item, er := db.GetItem(id)
+	if er != nil {
+		log.Println(er)
+		http.Error(w, er.Error(), http.StatusBadRequest)
+		return
+	}
+	files := r.MultipartForm.File["image"]
+	er = os.Remove(item.Data.Links.Original)
+	if er != nil {
+		log.Println(er)
+		http.Error(w, er.Error(), http.StatusBadRequest)
+		return
+	}
+	er = os.Remove(item.Data.Links.Short)
+	if er != nil {
+		log.Println(er)
+		http.Error(w, er.Error(), http.StatusBadRequest)
+		return
+	}
+	er = saveCoverImage(files[0], item)
+	if er != nil {
+		log.Println(er)
+		http.Error(w, er.Error(), http.StatusBadRequest)
+		return
+	}
+	resp, er := json.Marshal(item)
+	if er != nil {
+		log.Println(er)
+		http.Error(w, er.Error(), http.StatusBadRequest)
+		return
+	}
 	fmt.Fprintf(w, string(resp))
 }
 
@@ -367,35 +391,6 @@ func createTag(w http.ResponseWriter, r *http.Request) {
 	if er != nil {
 		log.Println(er)
 		http.Error(w, er.Error(), http.StatusBadRequest)
-		return
-	}
-}
-
-func uploadFile(w http.ResponseWriter, r *http.Request) {
-	if !authChecker(w, r) {
-		return
-	}
-	params := mux.Vars(r)
-	id := params["id"]
-	err := r.ParseMultipartForm(32 << 20) // limit your max input length!
-	if err != nil {
-		log.Println(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	file, header, err := r.FormFile("image")
-	if err != nil {
-		log.Println(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer file.Close()
-	name := strings.Split(header.Filename, ".")
-	err = makeDirAndSaveFile(file,
-		filepath.Join("static", "img", id, fmt.Sprintf("%s_cover.%s", id, name[1])))
-	if err != nil {
-		log.Println(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 }
@@ -569,6 +564,56 @@ func appJson(w http.ResponseWriter) {
 }
 
 //functions
+func parseId(r *http.Request) (int64, error) {
+	params := mux.Vars(r)
+	id := params["id"]
+	if len(id) == 0 {
+		er := fmt.Errorf("There should be 1 item id in request %s\n", r.URL.Path)
+		log.Println(er)
+		return 0, er
+	}
+	idInt, er := strconv.ParseInt(id, 0, 64)
+	if er != nil {
+		log.Println(er)
+		return 0, er
+	}
+	return idInt, nil
+}
+
+func coverImageLinks(id int64, extension string) (string, string) {
+	random := rand.Intn(10000)
+	return fmt.Sprintf("./static/img/%[1]d/%[1]d_original_%[3]d.%[2]s", id, extension, random),
+		fmt.Sprintf("./static/img/%[1]d/%[1]d_short_%[2]d.webp", id, random)
+}
+
+func saveCoverImage(file *multipart.FileHeader, item *db.StoreItem) error {
+	f, er := file.Open()
+	if er != nil {
+		log.Println(er)
+		return er
+	}
+	defer f.Close()
+	filePathOriginal, filePathShort := coverImageLinks(item.Id, strings.Split(file.Filename, ".")[1])
+	er = makeDirAndSaveFile(f, filePathOriginal)
+	if er != nil {
+		log.Println(er.Error())
+		return er
+	}
+	item.Data.Links.Original = filePathOriginal
+	item.Data.Links.Short = filePathShort
+	er = imageprocessing.Compress(filePathOriginal, 40, filePathShort)
+	if er != nil {
+		log.Println(er.Error())
+		return er
+	}
+	_, er = db.UpdateItem(*item)
+	if er != nil {
+		log.Println(er.Error())
+		return er
+	}
+	return nil
+}
+
 func makeDirAndSaveFile(file multipart.File, path string) error {
 	dir := filepath.Dir(path)
 	err := os.MkdirAll(dir, os.ModePerm)
@@ -639,12 +684,12 @@ func main() {
 	router.HandleFunc("/api/items", getItems).Methods(http.MethodGet)
 	router.HandleFunc("/api/items", createItem).Methods(http.MethodPost)
 	router.HandleFunc("/api/items/{id}", updateItem).Methods(http.MethodPatch)
+	router.HandleFunc("/api/items/{id}/image/cover", updateCoverImage).Methods(http.MethodPatch)
 	router.HandleFunc("/api/orders", createOrder).Methods(http.MethodPost)
 	router.HandleFunc("/api/orders/{uuid}", viewOrderByUUID).Methods(http.MethodGet)
 	router.HandleFunc("/api/orders/{id}", updateOrder).Methods(http.MethodPatch)
 	router.HandleFunc("/api/orders/{id}/requestPayment", requestPayment).Methods(http.MethodGet)
 	router.HandleFunc("/api/orders", getOrders).Methods(http.MethodGet)
-	router.HandleFunc("/api/items/{id}/uploadCoverImage", uploadFile).Methods(http.MethodPost)
 	router.HandleFunc("/api/tags", createTag).Methods(http.MethodPost)
 	router.HandleFunc("/api/tags", getTags).Methods(http.MethodGet)
 	router.HandleFunc("/api/menu", getMenu).Methods(http.MethodGet)
