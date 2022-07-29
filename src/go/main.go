@@ -6,6 +6,7 @@ import (
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"io"
+	"io/ioutil"
 	"log"
 	"math/rand"
 	"mime/multipart"
@@ -103,7 +104,7 @@ func createOrder(w http.ResponseWriter, r *http.Request) {
 		"Адрес", created.Data.Address,
 		"Индекс", created.Data.Index,
 		"Способ доставки", created.Data.DeliveryOption.Description,
-		"Ссылка на заказ", generateOrderLinc(created.Uuid, "NorthwindCards"))
+		"Ссылка на заказ", generateOrderLink(created.Uuid, "NorthwindCards"))
 	if er == nil {
 		er = email.Send(created.Data.Email, "Новый заказ в магазине NorthwindCards", text+table)
 	}
@@ -123,7 +124,7 @@ func createOrder(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func generateOrderLinc(uuid string, text string) string {
+func generateOrderLink(uuid string, text string) string {
 	return fmt.Sprintf("<a href='http://%s/orders/%s'>%s</a>", props.Get()["site.host"].(string), uuid, text)
 }
 
@@ -434,16 +435,7 @@ func updateOrder(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, er.Error(), http.StatusBadRequest)
 		return
 	}
-	patch := make(map[string]string)
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	er = decoder.Decode(&patch)
-	if er != nil {
-		log.Println(er)
-		http.Error(w, er.Error(), http.StatusBadRequest)
-		return
-	}
-	er = handlePatchOrder(idInt, patch)
+	er = handlePatchOrder(idInt, r)
 	if er != nil {
 		log.Println(er)
 		http.Error(w, er.Error(), http.StatusInternalServerError)
@@ -451,7 +443,26 @@ func updateOrder(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func handlePatchOrder(id int, patch map[string]string) error {
+func handlePatchOrder(id int, r *http.Request) error {
+	er := r.ParseMultipartForm(32 << 20) // limit your max input length!
+	if er != nil {
+		log.Println(er)
+		return er
+	}
+	patch := make(map[string]string)
+	er = json.Unmarshal([]byte(r.FormValue("data")), &patch)
+	if er != nil {
+		log.Println(er)
+		return er
+	}
+	/*patch := make(map[string]string)
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	er = decoder.Decode(&patch)*/
+	if er != nil {
+		log.Println(er)
+		return er
+	}
 	advance := patch["advance"]
 	if len(advance) > 0 {
 		switch advance {
@@ -479,7 +490,7 @@ func handlePatchOrder(id int, patch map[string]string) error {
 				return er
 			}
 			er = email.Send(order.Data.Email, "Стоимость доставки заказа обновлена",
-				generateOrderLinc(order.Uuid, "NorthwindCards"))
+				generateOrderLink(order.Uuid, "NorthwindCards"))
 			if er != nil {
 				log.Println(er)
 			}
@@ -512,8 +523,45 @@ func handlePatchOrder(id int, patch map[string]string) error {
 Вы можете отслеживать отправку с помощью трекера на <a href="https://www.pochta.ru/tracking#%[2]s">сайте Почты России</a> или в приложении Почты России. 
 Попутного ветра!
 %[2]s`,
-					generateOrderLinc(order.Uuid, "заказ"),
+					generateOrderLink(order.Uuid, "заказ"),
 					postalCode))
+		case "SENT_IMAGE":
+			files := r.MultipartForm.File["image"]
+			file, er := files[0].Open()
+			if er != nil {
+				log.Println(er)
+				return er
+			}
+			defer file.Close()
+			buff, er := ioutil.ReadAll(file)
+			if er != nil {
+				log.Println(er)
+				return er
+			}
+			imageLink := fmt.Sprintf("./static/orders/%[1]d/img/%[1]d_proof_%[2]d.webp",
+				id, rand.Intn(10000))
+			dir := filepath.Dir(imageLink)
+			err := os.MkdirAll(dir, os.ModePerm)
+			if err != nil {
+				log.Println(err)
+				return err
+			}
+			er = imageprocessing.Compress(buff, 30, imageLink)
+			if er != nil {
+				log.Println(er)
+				return er
+			}
+			order, er := db.GetOrderById(id)
+			if er != nil {
+				log.Println(er)
+				return er
+			}
+			order.Data.Links.Proof = imageLink
+			er = db.UpdateOrderStateData(id, db.SENT_TO_CUSTOMER, &order.Data)
+			if er != nil {
+				log.Println(er)
+				return er
+			}
 		}
 	}
 	return nil
@@ -601,7 +649,7 @@ func saveCoverImage(file *multipart.FileHeader, item *db.StoreItem) error {
 	}
 	item.Data.Links.Original = filePathOriginal
 	item.Data.Links.Short = filePathShort
-	er = imageprocessing.Compress(filePathOriginal, 40, filePathShort)
+	er = imageprocessing.CompressFile(filePathOriginal, 40, filePathShort)
 	if er != nil {
 		log.Println(er.Error())
 		return er
@@ -618,6 +666,7 @@ func makeDirAndSaveFile(file multipart.File, path string) error {
 	dir := filepath.Dir(path)
 	err := os.MkdirAll(dir, os.ModePerm)
 	if err != nil {
+		log.Println(err)
 		return err
 	}
 	osFile, _ := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0666)
