@@ -142,7 +142,7 @@ func NewInitForm(order db.Order) *InitRequest {
 	numberOfItems := len(order.Data.Items)
 	if order.Data.DeliveryOption.Price > 0 {
 		iForm.Receipt.Items = make([]Item, numberOfItems+1)
-		iForm.Receipt.Items[numberOfItems-1] = Item{
+		iForm.Receipt.Items[numberOfItems] = Item{
 			Name:          order.Data.DeliveryOption.Description,
 			Quantity:      1,
 			Amount:        order.Data.DeliveryOption.Price * 100,
