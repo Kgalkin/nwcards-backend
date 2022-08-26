@@ -1,13 +1,17 @@
 package email
 
 import (
+	"bytes"
 	"crypto/tls"
+	"encoding/base64"
 	"fmt"
 	"log"
 	"net"
 	"net/mail"
 	"net/smtp"
 	"nwcards-backend/src/go/props"
+	"os"
+	"path/filepath"
 )
 
 var from string
@@ -24,14 +28,58 @@ func Send(to string, subject string, body string) error {
 		"MIME-version: 1.0;\nContent-Type: text/html; charset=\"UTF-8\";\n\n" +
 		body
 
+	return sendRow(to, []byte(msg))
+}
+
+func sendRow(to string, body []byte) error {
 	err := smtp.SendMail("smtp.gmail.com:587",
 		smtp.PlainAuth("", from, pass, "smtp.gmail.com"),
-		from, []string{to}, []byte(msg))
+		from, []string{to}, body)
 
 	if err != nil {
 		log.Printf("smtp error: %s", err)
 	}
 	return err
+}
+
+func SendWithFile(to string, subject string, body string, path string) error {
+	var buf bytes.Buffer
+
+	buf.WriteString(fmt.Sprintf("From: %s\r\n", from))
+	buf.WriteString(fmt.Sprintf("To: %s\r\n", to))
+	buf.WriteString(fmt.Sprintf("Subject: %s\r\n", subject))
+
+	boundary := "my-boundary-1101101"
+	buf.WriteString("MIME-Version: 1.0\r\n")
+	buf.WriteString(fmt.Sprintf("Content-Type: multipart/mixed; boundary=%s\n",
+		boundary))
+
+	buf.WriteString(fmt.Sprintf("\r\n--%s\r\n", boundary))
+	buf.WriteString("Content-Type: text/html; charset=\"UTF-8\"\r\n")
+	buf.WriteString(fmt.Sprintf("\r\n%s", body))
+
+	fileName := filepath.Base(path)
+
+	buf.WriteString(fmt.Sprintf("\r\n--%s\r\n", boundary))
+	buf.WriteString("Content-Type: text/plain; charset=\"utf-8\"\r\n")
+	buf.WriteString("Content-Transfer-Encoding: base64\r\n")
+	buf.WriteString(fmt.Sprintf("Content-Disposition: attachment; filename=%s\r\n", fileName))
+	buf.WriteString(fmt.Sprintf("Content-ID: <%s>\r\n\r\n", fileName))
+
+	data, er := os.ReadFile(path)
+	if er != nil {
+		log.Println(er)
+		return er
+	}
+
+	b := make([]byte, base64.StdEncoding.EncodedLen(len(data)))
+	base64.StdEncoding.Encode(b, data)
+	buf.Write(b)
+	buf.WriteString(fmt.Sprintf("\r\n--%s", boundary))
+
+	buf.WriteString("--")
+
+	return sendRow(to, buf.Bytes())
 }
 
 func SendEmail(recipient, text string) error {

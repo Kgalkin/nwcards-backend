@@ -541,10 +541,10 @@ func handlePatchOrder(id int, r *http.Request) error {
 			imageLink := fmt.Sprintf("./static/orders/%[1]d/img/%[1]d_proof_%[2]d.webp",
 				id, rand.Intn(10000))
 			dir := filepath.Dir(imageLink)
-			err := os.MkdirAll(dir, os.ModePerm)
-			if err != nil {
-				log.Println(err)
-				return err
+			er = os.MkdirAll(dir, os.ModePerm)
+			if er != nil {
+				log.Println(er)
+				return er
 			}
 			er = imageprocessing.Compress(buff, 30, imageLink)
 			if er != nil {
@@ -558,6 +558,14 @@ func handlePatchOrder(id int, r *http.Request) error {
 			}
 			order.Data.Links.Proof = imageLink
 			er = db.UpdateOrderStateData(id, db.SENT_TO_CUSTOMER, &order.Data)
+			if er != nil {
+				log.Println(er)
+				return er
+			}
+			er = email.SendWithFile(order.Data.Email,
+				fmt.Sprintf("ваш заказ отправлен из магазина %s", props.Get()["site.host"].(string)),
+				"Ваш заказ отправлен простым писмом, в приложении к письму вы найдете фото-подтверждение.",
+				imageLink)
 			if er != nil {
 				log.Println(er)
 				return er
