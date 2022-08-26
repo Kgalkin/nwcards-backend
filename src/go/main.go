@@ -538,7 +538,7 @@ func handlePatchOrder(id int, r *http.Request) error {
 				log.Println(er)
 				return er
 			}
-			imageLink := fmt.Sprintf("./static/orders/%[1]d/img/%[1]d_proof_%[2]d.webp",
+			imageLink := fmt.Sprintf("./orders/%[1]d/img/%[1]d_proof_%[2]d.webp",
 				id, rand.Intn(10000))
 			dir := filepath.Dir(imageLink)
 			er = os.MkdirAll(dir, os.ModePerm)
