@@ -564,7 +564,7 @@ func handlePatchOrder(id int, r *http.Request) error {
 			}
 			er = email.SendWithFile(order.Data.Email,
 				fmt.Sprintf("ваш заказ отправлен из магазина %s", props.Get()["site.host"].(string)),
-				"Ваш заказ отправлен простым писмом, в приложении к письму вы найдете фото-подтверждение.",
+				"Ваш заказ отправлен простым писмом, в приложении к письму вы найдете фото-подтверждение. \n(Для просмотра изображения используйте браузер)",
 				imageLink)
 			if er != nil {
 				log.Println(er)
@@ -735,7 +735,7 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	router := mux.NewRouter()
-	router.Use(authMiddleware)
+	//router.Use(authMiddleware)
 	router.Use(func(next http.Handler) http.Handler { return handlers.LoggingHandler(os.Stdout, next) })
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static/"))))
 	router.HandleFunc("/api/items", getItems).Methods(http.MethodGet)
