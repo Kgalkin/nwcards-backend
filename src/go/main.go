@@ -705,10 +705,18 @@ func handlePayment(w http.ResponseWriter, r *http.Request) {
 			log.Println(er)
 			return
 		}
-		er = db.UpdateOrderStateData(orderId, db.PAYMENT_RECEIVED, nil)
+		order, er := db.GetOrderById(orderId)
 		if er != nil {
 			log.Println(er)
+			return
 		}
+		if order.State != db.SENT_TO_CUSTOMER {
+			er = db.UpdateOrderStateData(orderId, db.PAYMENT_RECEIVED, nil)
+			if er != nil {
+				log.Println(er)
+			}
+		}
+		w.Write([]byte("OK"))
 	}
 }
 
