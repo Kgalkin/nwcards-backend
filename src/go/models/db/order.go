@@ -82,11 +82,12 @@ type OrderItem struct {
 }
 
 const (
-	CREATED          = "created"
-	PAYMENT_RECEIVED = "payment_received"
-	SENT_TO_CUSTOMER = "sent_to_customer"
-	COMPLETED        = "completed"
-	CANCELED         = "canceled"
+	CREATED            = "created"
+	PAYMENT_RECEIVED   = "payment_received"
+	READY_FOR_SHIPPING = "ready_for_shipping"
+	SENT_TO_CUSTOMER   = "sent_to_customer"
+	COMPLETED          = "completed"
+	CANCELED           = "canceled"
 )
 
 func getStates() []string {

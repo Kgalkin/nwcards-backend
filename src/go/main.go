@@ -493,6 +493,13 @@ func handlePatchOrder(id int, r *http.Request) error {
 				generateOrderLink(order.Uuid, "NorthwindCards"))
 			if er != nil {
 				log.Println(er)
+				return er
+			}
+		case "READY_FOR_SHIPPING":
+			er := db.UpdateOrder(id, fmt.Sprintf("state = '%s'", db.READY_FOR_SHIPPING))
+			if er != nil {
+				log.Println(er)
+				return er
 			}
 		case "SENT_CODE":
 			postalCode := patch["postalCode"]
