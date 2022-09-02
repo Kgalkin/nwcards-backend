@@ -35,6 +35,7 @@ type OrderData struct {
 	PostalCode     string         `json:"postalCode"`
 	Items          []OrderItem    `json:"items"`
 	PaymentLink    string         `json:"payment_link"`
+	Comments       string         `json:"comments"`
 	Links          struct {
 		Proof string   `json:"proof"`
 		Other []string `json:"other"`
