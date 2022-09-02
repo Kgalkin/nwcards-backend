@@ -513,7 +513,7 @@ func handlePatchOrder(id int, r *http.Request) error {
 				log.Println(er)
 				return er
 			}
-			if order.State != db.PAYMENT_RECEIVED {
+			if order.State != db.READY_FOR_SHIPPING {
 				er = fmt.Errorf("SENT advance for order: %d but order state != %s\n", id, db.PAYMENT_RECEIVED)
 				return er
 			}
@@ -533,6 +533,15 @@ func handlePatchOrder(id int, r *http.Request) error {
 					generateOrderLink(order.Uuid, "заказ"),
 					postalCode))
 		case "SENT_IMAGE":
+			order, er := db.GetOrderById(id)
+			if er != nil {
+				log.Println(er)
+				return er
+			}
+			if order.State != db.READY_FOR_SHIPPING {
+				er = fmt.Errorf("SENT advance for order: %d but order state != %s\n", id, db.PAYMENT_RECEIVED)
+				return er
+			}
 			files := r.MultipartForm.File["image"]
 			file, er := files[0].Open()
 			if er != nil {
@@ -554,11 +563,6 @@ func handlePatchOrder(id int, r *http.Request) error {
 				return er
 			}
 			er = imageprocessing.Compress(buff, 30, imageLink)
-			if er != nil {
-				log.Println(er)
-				return er
-			}
-			order, er := db.GetOrderById(id)
 			if er != nil {
 				log.Println(er)
 				return er
