@@ -193,7 +193,7 @@ func paramsToDbRequest(params map[string][]string) (string, string, int64) {
 			taglist += ", " + tag
 		}
 		method := "&&"
-		if m := params["method"]; len(m) > 0 && m[0] == "and" {
+		if m := params["tags.method"]; len(m) > 0 && m[0] == "and" {
 			method = "@>"
 		}
 		where = fmt.Sprintf("\nWHERE tags %s '{%s}'", method, taglist[2:])
