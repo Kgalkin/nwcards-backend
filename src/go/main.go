@@ -124,6 +124,17 @@ func createOrder(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func checkSimplePost(order db.Order) error {
+	/*if order.Data.DeliveryOption.Id == 1 {
+		tags := ""
+		for _, item := range order.Data.Items {
+
+		}
+		items, err := db.GetItems(map[string][]string{"tags": {}})
+	}*/
+	return nil
+}
+
 func generateOrderLink(uuid string, text string) string {
 	return fmt.Sprintf("<a href='http://%s/orders/%s'>%s</a>", props.Get()["site.host"].(string), uuid, text)
 }
