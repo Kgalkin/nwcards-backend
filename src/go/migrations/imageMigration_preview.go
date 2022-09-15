@@ -1,6 +1,7 @@
 package migrations
 
 import (
+	"fmt"
 	"github.com/h2non/bimg"
 	"log"
 	"nwcards-backend/src/go/imageprocessing"
@@ -39,6 +40,12 @@ func Migrate_images_to_preview() error {
 			return err
 		}
 		it.Data.Links.Preview = preview
+		_, err = db.UpdateItem(*it)
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+		log.Print(fmt.Sprintf("%d done", it.Id))
 	}
 	return nil
 }
