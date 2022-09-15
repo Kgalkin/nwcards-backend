@@ -13,7 +13,6 @@ import (
 	"net/http"
 	"nwcards-backend/src/go/email"
 	"nwcards-backend/src/go/imageprocessing"
-	"nwcards-backend/src/go/migrations"
 	"nwcards-backend/src/go/models/db"
 	"nwcards-backend/src/go/payments"
 	"nwcards-backend/src/go/props"
@@ -720,10 +719,6 @@ func authMiddleware(next http.Handler) http.Handler {
 }
 
 func main() {
-	er := migrations.Migrate_images_to_preview()
-	if er != nil {
-		panic(er)
-	}
 	go func() {
 		for i := 0; i < 10; i++ {
 			fmt.Println("time ticked")
