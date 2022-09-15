@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
-	"io"
+	"github.com/h2non/bimg"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"nwcards-backend/src/go/email"
 	"nwcards-backend/src/go/imageprocessing"
+	"nwcards-backend/src/go/migrations"
 	"nwcards-backend/src/go/models/db"
 	"nwcards-backend/src/go/payments"
 	"nwcards-backend/src/go/props"
@@ -31,6 +32,9 @@ func getItems(w http.ResponseWriter, r *http.Request) {
 		log.Println(er)
 		http.Error(w, er.Error(), http.StatusInternalServerError)
 		return
+	}
+	for _, it := range a.Items {
+		it.Data.Links.Original = ""
 	}
 	resp, _ := json.Marshal(a)
 	fmt.Fprintf(w, string(resp))
@@ -565,7 +569,7 @@ func handlePatchOrder(id int, r *http.Request) error {
 				log.Println(er)
 				return er
 			}
-			imageLink := fmt.Sprintf("./orders/%[1]d/img/%[1]d_proof_%[2]d.webp",
+			imageLink := fmt.Sprintf("./orders/%[1]d/img/%[1]d_proof_%[2]d.jpeg",
 				id, rand.Intn(10000))
 			dir := filepath.Dir(imageLink)
 			er = os.MkdirAll(dir, os.ModePerm)
@@ -573,7 +577,7 @@ func handlePatchOrder(id int, r *http.Request) error {
 				log.Println(er)
 				return er
 			}
-			er = imageprocessing.Compress(buff, 30, imageLink)
+			er = imageprocessing.CompressToType(buff, 10, imageLink, bimg.JPEG)
 			if er != nil {
 				log.Println(er)
 				return er
@@ -586,7 +590,7 @@ func handlePatchOrder(id int, r *http.Request) error {
 			}
 			er = email.SendWithFile(order.Data.Email,
 				fmt.Sprintf("ваш заказ отправлен из магазина %s", props.Get()["site.host"].(string)),
-				"Ваш заказ отправлен простым писмом, в приложении к письму вы найдете фото-подтверждение. \n(Для просмотра изображения используйте браузер)",
+				"Ваш заказ отправлен простым писмом, в приложении к письму вы найдете фото-подтверждение.",
 				imageLink)
 			if er != nil {
 				log.Println(er)
@@ -658,12 +662,6 @@ func parseId(r *http.Request) (int64, error) {
 	return idInt, nil
 }
 
-func coverImageLinks(id int64, extension string) (string, string) {
-	random := rand.Intn(10000)
-	return fmt.Sprintf("./static/img/%[1]d/%[1]d_original_%[3]d.%[2]s", id, extension, random),
-		fmt.Sprintf("./static/img/%[1]d/%[1]d_short_%[2]d.webp", id, random)
-}
-
 func saveCoverImage(file *multipart.FileHeader, item *db.StoreItem) error {
 	f, er := file.Open()
 	if er != nil {
@@ -671,41 +669,7 @@ func saveCoverImage(file *multipart.FileHeader, item *db.StoreItem) error {
 		return er
 	}
 	defer f.Close()
-	filePathOriginal, filePathShort := coverImageLinks(item.Id, strings.Split(file.Filename, ".")[1])
-	er = makeDirAndSaveFile(f, filePathOriginal)
-	if er != nil {
-		log.Println(er.Error())
-		return er
-	}
-	item.Data.Links.Original = filePathOriginal
-	item.Data.Links.Short = filePathShort
-	er = imageprocessing.CompressFile(filePathOriginal, 40, filePathShort)
-	if er != nil {
-		log.Println(er.Error())
-		return er
-	}
-	_, er = db.UpdateItem(*item)
-	if er != nil {
-		log.Println(er.Error())
-		return er
-	}
-	return nil
-}
-
-func makeDirAndSaveFile(file multipart.File, path string) error {
-	dir := filepath.Dir(path)
-	err := os.MkdirAll(dir, os.ModePerm)
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-	osFile, _ := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0666)
-	defer osFile.Close()
-	_, err = io.Copy(osFile, file)
-	if err != nil {
-		return err
-	}
-	return nil
+	return imageprocessing.CreateImagesForItem(f, item, strings.Split(file.Filename, ".")[1])
 }
 
 func handlePayment(w http.ResponseWriter, r *http.Request) {
@@ -756,6 +720,10 @@ func authMiddleware(next http.Handler) http.Handler {
 }
 
 func main() {
+	er := migrations.Migrate_images_to_preview()
+	if er != nil {
+		panic(er)
+	}
 	go func() {
 		for i := 0; i < 10; i++ {
 			fmt.Println("time ticked")

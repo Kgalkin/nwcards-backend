@@ -16,6 +16,7 @@ type StoreItemData struct {
 	Links       struct {
 		Original string   `json:"original"`
 		Short    string   `json:"short"`
+		Preview  string   `json:"preview"`
 		Other    []string `json:"other"`
 	} `json:"links"`
 	//Price       int    `json:"price"`
