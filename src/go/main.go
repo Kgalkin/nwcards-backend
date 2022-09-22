@@ -540,10 +540,13 @@ func handlePatchOrder(id int, r *http.Request) error {
 			er = email.Send(order.Data.Email,
 				fmt.Sprintf("ваш заказ отправлен из магазина %s", props.Get()["site.host"].(string)),
 				fmt.Sprintf(
-					`Здравствуйте! Ваш %[1]s из магазина North Wind Cards отправлен. 
-Вы можете отслеживать отправку с помощью трекера на <a href="https://www.pochta.ru/tracking#%[2]s">сайте Почты России</a> или в приложении Почты России. 
-Попутного ветра!
-%[2]s`,
+					`Здравствуйте! Ваш %[1]s из магазина North Wind Cards отправлен.<br/>
+Вы можете отслеживать отправку с помощью трекера на <a href="https://www.pochta.ru/tracking#%[2]s">сайте Почты России</a> или в приложении Почты России.<br/> 
+Попутного ветра!<br/>
+%[2]s<br/><br/>
+
+Будем благодарны за оставленный отзыв &#128144;<br/>
+<a href="https://vk.com/topic-182017496_46570052">Оставить отзыв</a>`,
 					generateOrderLink(order.Uuid, "заказ"),
 					postalCode))
 		case "SENT_IMAGE":
@@ -589,7 +592,9 @@ func handlePatchOrder(id int, r *http.Request) error {
 			}
 			er = email.SendWithFile(order.Data.Email,
 				fmt.Sprintf("ваш заказ отправлен из магазина %s", props.Get()["site.host"].(string)),
-				"Ваш заказ отправлен простым писмом, в приложении к письму вы найдете фото-подтверждение.",
+				`Ваш заказ отправлен простым писмом, в приложении к письму вы найдете фото-подтверждение.<br/><br/>
+Будем благодарны за оставленный отзыв &#128144;<br/>
+<a href="https://vk.com/topic-182017496_46570052">Оставить отзыв</a>`,
 				imageLink)
 			if er != nil {
 				log.Println(er)
