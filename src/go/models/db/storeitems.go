@@ -215,7 +215,7 @@ func paramsToDbRequest(params map[string][]string) (string, string, int64) {
 	if err != nil {
 		panic(err)
 	}
-	return fmt.Sprintf("%s\nORDER BY (instock > 0) desc, id\nLIMIT %s\nOFFSET %s", where, limit, offset),
+	return fmt.Sprintf("%s\nORDER BY (instock > 0) desc, id desc\nLIMIT %s\nOFFSET %s", where, limit, offset),
 		where,
 		offsetInt + sizeInt
 }
