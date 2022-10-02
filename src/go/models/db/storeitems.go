@@ -84,6 +84,23 @@ func UpdateItem(item StoreItem) (*StoreItem, error) {
 	return GetItem(item.Id)
 }
 
+func UpdateItemWithoutLinks(item StoreItem) (*StoreItem, error) {
+	er := checkTags(item.Tags)
+	if er != nil {
+		return nil, er
+	}
+	_, er = db.Exec(`UPDATE store_items SET data = jsonb_set($2, '{links}', data -> 'links'),
+ 	price = $3,
+  	instock = $4,
+  	tags = $5 
+  	WHERE id = $1`,
+		item.Id, item.Data.String(), item.Price, item.InStock, pq.Array(item.Tags))
+	if er != nil {
+		return nil, er
+	}
+	return GetItem(item.Id)
+}
+
 func checkTags(tags []int64) error {
 	var result bool
 	allTags, er := GetTags()
