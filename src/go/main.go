@@ -707,6 +707,17 @@ func handlePayment(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		w.Write([]byte("OK"))
+
+		er = email.Send(order.Data.Email,
+			"Подтверждение оплаты в магазине "+props.Get()["site.host"].(string),
+			`Здравствуйте!<br/>
+Ваш заказ в магазине открыток North Wind Cards оплачен, мы приступаем к сборке.<br/>
+Он будет собран и отправлен в течение 3-5 дней. Вы получите письмо с трекером на почту или же фото 
+конверта с марками в случае оплаты доставки простым письмом.<br/><br/>
+Спасибо за заказ! `)
+		if er != nil {
+			log.Println(er)
+		}
 	}
 }
 
