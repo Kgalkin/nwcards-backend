@@ -7,9 +7,24 @@ import (
 )
 
 type DeliveryOption struct {
-	Description string `json:"description"`
-	Price       int    `json:"price"`
-	Id          int    `json:"id"`
+	Description string       `json:"description"`
+	Price       int          `json:"price"`
+	Id          int          `json:"id"`
+	Data        DeliveryData `json:"data,omitempty"`
+}
+
+type DeliveryData struct {
+	Constraints []DeliveryConstraint `json:"constraints,omitempty"`
+}
+
+type DeliveryConstraint struct {
+	Type      string `json:"type,omitempty"`
+	Max       int    `json:"max,omitempty"`
+	Min       int    `json:"min,omitempty"`
+	Text      string `json:"text,omitempty"`
+	FieldName string `json:"fieldName,omitempty"`
+	Equals    string `json:"equals,omitempty"`
+	Priority  int    `json:"priority,omitempty"` //if there is priority on option it is counted as Unique
 }
 
 func (*DeliveryOption) Scan(src interface{}) error {
@@ -18,6 +33,14 @@ func (*DeliveryOption) Scan(src interface{}) error {
 		return fmt.Errorf("Data field must be a string, got #{src} instead\n")
 	}
 	return json.Unmarshal(uintVal, &DeliveryOption{})
+}
+
+func (data *DeliveryData) Scan(src interface{}) error {
+	uintVal, ok := src.([]uint8)
+	if !ok {
+		return nil
+	}
+	return json.Unmarshal(uintVal, data)
 }
 
 func resolveDeliveryOption(id int) (*DeliveryOption, error) {
@@ -30,7 +53,7 @@ func resolveDeliveryOption(id int) (*DeliveryOption, error) {
 	options := make([]*DeliveryOption, 0)
 	for rows.Next() {
 		option := new(DeliveryOption)
-		er := rows.Scan(&option.Description, &option.Price, &option.Id)
+		er := rows.Scan(&option.Description, &option.Price, &option.Id, &option.Data)
 		if er != nil {
 			log.Println(er)
 			return nil, er
@@ -53,7 +76,7 @@ func GetDeliveryOptions() ([]*DeliveryOption, error) {
 	options := make([]*DeliveryOption, 0)
 	for rows.Next() {
 		option := new(DeliveryOption)
-		er := rows.Scan(&option.Description, &option.Price, &option.Id)
+		er := rows.Scan(&option.Description, &option.Price, &option.Id, &option.Data)
 		if er != nil {
 			log.Println(er)
 			return nil, er
