@@ -31,11 +31,12 @@ func (id *StoreItemData) Scan(src interface{}) error {
 }
 
 type StoreItem struct {
-	Id      int64         `json:"id"`
-	Data    StoreItemData `json:"data"`
-	Price   int           `json:"price"`
-	InStock int           `json:"inStock"`
-	Tags    []int64       `json:"tags"`
+	Id       int64         `json:"id"`
+	Data     StoreItemData `json:"data"`
+	Price    int           `json:"price"`
+	InStock  int           `json:"inStock"`
+	Tags     []int64       `json:"tags"`
+	OldPrice int           `json:"oldPrice"`
 }
 
 type StoreItemsPage struct {
@@ -92,10 +93,12 @@ func UpdateItemWithoutLinks(item StoreItem) (*StoreItem, error) {
 	_, er = db.Exec(`UPDATE store_items SET data = jsonb_set($2, '{links}', data -> 'links'),
  	price = $3,
   	instock = $4,
-  	tags = $5 
+  	tags = $5,
+    old_price = $6                 
   	WHERE id = $1`,
-		item.Id, item.Data.String(), item.Price, item.InStock, pq.Array(item.Tags))
+		item.Id, item.Data.String(), item.Price, item.InStock, pq.Array(item.Tags), item.OldPrice)
 	if er != nil {
+		log.Println(er)
 		return nil, er
 	}
 	return GetItem(item.Id)
@@ -131,7 +134,7 @@ func GetItem(id int64) (*StoreItem, error) {
 	defer rows.Close()
 	item := new(StoreItem)
 	rows.Next()
-	err = rows.Scan(&item.Id, &item.Data, &item.Price, &item.InStock, pq.Array(&item.Tags))
+	err = rows.Scan(&item.Id, &item.Data, &item.Price, &item.InStock, pq.Array(&item.Tags), &item.OldPrice)
 	if err != nil {
 		log.Println(err)
 		return nil, err
@@ -241,7 +244,7 @@ func rowsToStoreItems(rows *sql.Rows) ([]*StoreItem, error) {
 	items := make([]*StoreItem, 0)
 	for rows.Next() {
 		item := new(StoreItem)
-		err := rows.Scan(&item.Id, &item.Data, &item.Price, &item.InStock, pq.Array(&item.Tags))
+		err := rows.Scan(&item.Id, &item.Data, &item.Price, &item.InStock, pq.Array(&item.Tags), &item.OldPrice)
 		if err != nil {
 			log.Println(err)
 			return nil, err
