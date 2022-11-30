@@ -14,17 +14,19 @@ type DeliveryOption struct {
 }
 
 type DeliveryData struct {
+	Description string               `json:"description,omitempty"`
 	Constraints []DeliveryConstraint `json:"constraints,omitempty"`
 }
 
 type DeliveryConstraint struct {
-	Type      string `json:"type,omitempty"`
-	Max       int    `json:"max,omitempty"`
-	Min       int    `json:"min,omitempty"`
-	Text      string `json:"text,omitempty"`
-	FieldName string `json:"fieldName,omitempty"`
-	Equals    string `json:"equals,omitempty"`
-	Priority  int    `json:"priority,omitempty"` //if there is priority on option it is counted as Unique
+	Type         string `json:"type,omitempty"`
+	Max          int    `json:"max,omitempty"`
+	Min          int    `json:"min,omitempty"`
+	Text         string `json:"text,omitempty"`
+	FieldName    string `json:"fieldName,omitempty"`
+	Equals       string `json:"equals,omitempty"`
+	FailOnAbsent bool   `json:"failOnAbsent,omitempty"`
+	Priority     int    `json:"priority,omitempty"` //if there is priority on option it is counted as Unique
 }
 
 func (*DeliveryOption) Scan(src interface{}) error {

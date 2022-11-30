@@ -8,17 +8,14 @@ import (
 )
 
 type Tag struct {
-	Value string  `json:"value"`
-	Id    int64   `json:"id"`
-	Data  TagData `json:"data,omitempty"`
+	Value string `json:"value"`
+	Id    int64  `json:"id"`
+	Data  Map    `json:"data,omitempty"`
 }
 
-type TagData struct {
-	Speciality      string `json:"speciality,omitempty"`
-	SimplePostCount int    `json:"simplePostCount,omitempty"`
-}
+type Map map[string]interface{}
 
-func (data *TagData) Scan(src interface{}) error {
+func (data *Map) Scan(src interface{}) error {
 	uintVal, ok := src.([]uint8)
 	if !ok {
 		return nil
