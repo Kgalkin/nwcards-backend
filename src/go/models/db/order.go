@@ -100,7 +100,7 @@ func getStates() []string {
 }
 
 func GetOrders() ([]*Order, error) {
-	rows, er := db.Query("SELECT * FROM orders ORDER BY created desc")
+	rows, er := db.Query("SELECT * FROM orders ORDER BY created desc LIMIT 100")
 	if er != nil {
 		log.Println(er)
 		return nil, er
