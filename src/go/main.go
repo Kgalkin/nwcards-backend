@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
@@ -82,18 +83,36 @@ func createOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	order.Data.Email = strings.TrimSpace(order.Data.Email)
+
+	for _, item := range order.Data.Items {
+		dbItem, er := db.GetItem(item.Id)
+		if er != nil {
+			newEr := errors.New(er.Error() + fmt.Sprintf("\nOn item number: %d\n", item.Id))
+			log.Println(newEr)
+			http.Error(w, newEr.Error(), http.StatusConflict)
+			return
+		}
+		if dbItem.InStock < item.Count {
+			message := fmt.Sprintf("Instock < count for item {id: %d,title: %s, count: %d, instock: %d}",
+				item.Id, dbItem.Data.Title, item.Count, dbItem.InStock)
+			log.Println(message)
+			http.Error(w, message, http.StatusConflict)
+		}
+	}
+
+	created, er := db.CreateOrder(order)
+	if er != nil {
+		log.Println(er)
+		http.Error(w, er.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	for _, item := range order.Data.Items {
 		if er = db.UpdateItemCount(item); er != nil {
 			log.Println(er)
 			http.Error(w, er.Error(), http.StatusConflict)
 			return
 		}
-	}
-	created, er := db.CreateOrder(order)
-	if er != nil {
-		log.Println(er)
-		http.Error(w, er.Error(), http.StatusInternalServerError)
-		return
 	}
 	w.WriteHeader(http.StatusCreated)
 	fmt.Fprintf(w, "{\"uuid\": \"%s\"}", created.Uuid)

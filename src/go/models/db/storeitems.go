@@ -54,13 +54,8 @@ func (id *StoreItemData) String() string {
 }
 
 func UpdateItemCount(item OrderItem) error {
-	data, _ := GetItem(item.Id)
-	if data.InStock < item.Count {
-		er := errors.New("Instock < count")
-		log.Println(er)
-		return er
-	}
-	_, er := db.Exec("UPDATE store_items SET instock = instock - $1 WHERE id = $2", item.Count, item.Id)
+	_, er := db.Exec("UPDATE store_items SET instock = instock - $1 WHERE id = $2",
+		item.Count, item.Id)
 	if er != nil {
 		log.Println(er)
 		return er
@@ -143,6 +138,7 @@ func GetItem(id int64) (*StoreItem, error) {
 		log.Println(err)
 		return nil, err
 	}
+	//log.Println(fmt.Sprintf("%d : %d", item.Id, item.InStock))
 	return item, nil
 }
 
