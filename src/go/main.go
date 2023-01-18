@@ -789,7 +789,7 @@ func main() {
 			"https://"+req.Host+req.URL.String(),
 			http.StatusMovedPermanently)
 	}
-	go http.ListenAndServe(props.Get()["api.host.address"].(string)+":80", http.HandlerFunc(redirect))
+	go http.ListenAndServe(props.Get()["api.host.address"].(string)+":8080", http.HandlerFunc(redirect))
 	log.Fatal(http.ListenAndServeTLS(props.Get()["api.host.address"].(string)+":443",
 		"certs/certificate.crt",
 		"certs/key.pem",
