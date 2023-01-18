@@ -766,7 +766,7 @@ func main() {
 	//router.Use(authMiddleware)
 	router.Use(func(next http.Handler) http.Handler { return handlers.LoggingHandler(os.Stdout, next) })
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static/"))))
-	router.HandleFunc("/api/items", getItems).Methods(http.MethodGet)
+	router.HandleFunc("/api/items", getItems).Methods(http.MethodGet).Schemes("https")
 	router.HandleFunc("/api/items", createItem).Methods(http.MethodPost)
 	router.HandleFunc("/api/items/{id}", updateItem).Methods(http.MethodPatch)
 	router.HandleFunc("/api/items/{id}/image/cover", updateCoverImage).Methods(http.MethodPatch)
@@ -783,5 +783,16 @@ func main() {
 	router.HandleFunc("/api/handlepaymentresult", handlePayment)
 	router.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) { enableCors(w) }).Methods(http.MethodOptions)
 	router.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./view/index.html") }).Methods(http.MethodGet)
-	log.Fatal(http.ListenAndServe(props.Get()["api.host.address"].(string), router))
+
+	redirect := func(w http.ResponseWriter, req *http.Request) {
+		http.Redirect(w, req,
+			"https://"+req.Host+req.URL.String(),
+			http.StatusMovedPermanently)
+	}
+	go http.ListenAndServe(props.Get()["api.host.address"].(string)+":80", http.HandlerFunc(redirect))
+	log.Fatal(http.ListenAndServeTLS(props.Get()["api.host.address"].(string)+":443",
+		"certs/certificate.crt",
+		"certs/key.pem",
+		router))
+
 }
