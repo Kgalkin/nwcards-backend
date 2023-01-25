@@ -785,9 +785,13 @@ func main() {
 	router.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./view/index.html") }).Methods(http.MethodGet)
 
 	redirect := func(w http.ResponseWriter, req *http.Request) {
-		http.Redirect(w, req,
-			"https://"+req.Host+req.URL.String(),
-			http.StatusMovedPermanently)
+		if req.Method == http.MethodGet {
+			http.Redirect(w, req,
+				"https://"+req.Host+req.URL.String(),
+				http.StatusMovedPermanently)
+		} else {
+			http.Error(w, "Not found", http.StatusNotFound)
+		}
 	}
 	go http.ListenAndServe(props.Get()["api.host.address"].(string)+":8080", http.HandlerFunc(redirect))
 	log.Fatal(http.ListenAndServeTLS(props.Get()["api.host.address"].(string)+":443",
