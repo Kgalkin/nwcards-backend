@@ -158,7 +158,7 @@ func checkSimplePost(order db.Order) error {
 }
 
 func generateOrderLink(uuid string, text string) string {
-	return fmt.Sprintf("<a href='http://%s/orders/%s'>%s</a>", props.Get()["site.host"].(string), uuid, text)
+	return fmt.Sprintf("<a href='https://%s/orders/%s'>%s</a>", props.Get()["site.host"].(string), uuid, text)
 }
 
 func createTable(args ...string) (string, error) {
