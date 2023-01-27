@@ -766,7 +766,7 @@ func main() {
 	//router.Use(authMiddleware)
 	router.Use(func(next http.Handler) http.Handler { return handlers.LoggingHandler(os.Stdout, next) })
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static/"))))
-	router.HandleFunc("/api/items", getItems).Methods(http.MethodGet).Schemes("https")
+	router.HandleFunc("/api/items", getItems).Methods(http.MethodGet)
 	router.HandleFunc("/api/items", createItem).Methods(http.MethodPost)
 	router.HandleFunc("/api/items/{id}", updateItem).Methods(http.MethodPatch)
 	router.HandleFunc("/api/items/{id}/image/cover", updateCoverImage).Methods(http.MethodPatch)
