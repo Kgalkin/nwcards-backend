@@ -36,6 +36,7 @@ type OrderData struct {
 	Items          []OrderItem    `json:"items"`
 	PaymentLink    string         `json:"payment_link"`
 	Comments       string         `json:"comments"`
+	AdminComments  string         `json:"adminComments"`
 	Links          struct {
 		Proof string   `json:"proof"`
 		Other []string `json:"other"`

@@ -505,6 +505,13 @@ func handlePatchOrder(id int, r *http.Request) error {
 				log.Println(er)
 				return er
 			}
+		case "ADD_ADMIN_COMMENTS":
+			er = db.UpdateOrder(id, fmt.Sprintf("data = data || '{\"adminComments\": \"%s\"}'",
+				patch["adminComments"]))
+			if er != nil {
+				log.Println(er)
+				return er
+			}
 		case "SET_DELIVERY_PRICE":
 			price, er := strconv.Atoi(patch["deliveryPrice"])
 			if er != nil {
