@@ -43,7 +43,7 @@ func getItems(w http.ResponseWriter, r *http.Request) {
 func getTags(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	enableCors(w)
-	allTags, er := db.GetTags()
+	allTags, er := db.GetTags(r.URL.Query())
 	if er != nil {
 		log.Println(er)
 		http.Error(w, er.Error(), http.StatusBadRequest)

@@ -8,9 +8,10 @@ import (
 )
 
 type Tag struct {
-	Value string `json:"value"`
-	Id    int64  `json:"id"`
-	Data  Map    `json:"data,omitempty"`
+	Value    string `json:"value"`
+	Id       int64  `json:"id"`
+	IsSystem bool   `json:"isSystem,omitempty""`
+	Data     Map    `json:"data,omitempty"`
 }
 
 type Map map[string]interface{}
@@ -23,8 +24,13 @@ func (data *Map) Scan(src interface{}) error {
 	return json.Unmarshal(uintVal, data)
 }
 
-func GetTags() ([]*Tag, error) {
-	rows, err := db.Query("SELECT * FROM tags")
+func GetTags(params map[string][]string) ([]*Tag, error) {
+	isSystem := params["isSystem"]
+	query := "SELECT * FROM tags"
+	if isSystem != nil {
+		query += " WHERE is_system = " + isSystem[0]
+	}
+	rows, err := db.Query(query)
 	if err != nil {
 		log.Println(err)
 		return nil, err
@@ -53,7 +59,7 @@ func readTags(rows *sql.Rows) ([]*Tag, error) {
 	items := make([]*Tag, 0)
 	for rows.Next() {
 		item := new(Tag)
-		err := rows.Scan(&item.Value, &item.Id, &item.Data)
+		err := rows.Scan(&item.Value, &item.Id, &item.Data, &item.IsSystem)
 		if err != nil {
 			log.Println(err)
 			return nil, err

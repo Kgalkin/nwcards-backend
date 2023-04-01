@@ -101,7 +101,7 @@ func UpdateItemWithoutLinks(item StoreItem) (*StoreItem, error) {
 
 func checkTags(tags []int64) error {
 	var result bool
-	allTags, er := GetTags()
+	allTags, er := GetTags(make(map[string][]string))
 	if er != nil {
 		return er
 	}
