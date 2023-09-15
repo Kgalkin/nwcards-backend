@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"strconv"
 	"time"
 )
 
@@ -77,10 +76,13 @@ func (od *OrderData) String() string {
 }
 
 type OrderItem struct {
-	Id    int64         `json:"id"`
-	Count int           `json:"count"`
-	Price int           `json:"price"`
-	Data  StoreItemData `json:"data"`
+	Id    int64                  `json:"id"`
+	Type  string                 `json:"type"`
+	Count int                    `json:"count"`
+	Price int                    `json:"price"`
+	Tags  []int64                `json:"tags"`
+	Data  StoreItemData          `json:"data"`
+	Props map[string]interface{} `json:"props,omitempty"`
 }
 
 const (
@@ -90,6 +92,7 @@ const (
 	SENT_TO_CUSTOMER   = "sent_to_customer"
 	COMPLETED          = "completed"
 	CANCELED           = "canceled"
+	ITEM_WRAPPER_TYPE  = "itemWrapper"
 )
 
 func getStates() []string {
@@ -121,11 +124,21 @@ func RevokeOrder(id int) error {
 		log.Println(er)
 		return er
 	}
+	upd := make(map[int64]int)
 	updateItems := ""
-	lastICount := len(order.Data.Items) - 1
-	for i, it := range order.Data.Items {
-		updateItems += fmt.Sprintf("(%d, %d)", it.Id, it.Count)
-		if i != lastICount {
+	for _, it := range order.Data.Items {
+		var count int
+		if it.Type == ITEM_WRAPPER_TYPE {
+			count = int(it.Props["countToWrap"].(float64)) * it.Count
+		} else {
+			count = it.Count
+		}
+		upd[it.Id] += count
+	}
+	for id, count := range upd {
+		updateItems += fmt.Sprintf("(%d, %d)", id, count)
+		delete(upd, id)
+		if len(upd) > 0 {
 			updateItems += ",\n"
 		}
 	}
@@ -249,28 +262,6 @@ func GetOrderByUUID(uuid string) (*Order, error) {
 }
 
 func CreateOrder(order Order) (*Order, error) {
-	ids := ""
-	for i, item := range order.Data.Items {
-		if i > 0 {
-			ids += ","
-		}
-		ids += strconv.FormatInt(item.Id, 10)
-	}
-	items, er := GetItems(map[string][]string{"ids": {ids}})
-	if er != nil {
-		log.Println(er)
-		return nil, er
-	}
-	for i, _ := range order.Data.Items {
-		item := &order.Data.Items[i]
-		for _, it := range items.Items {
-			if it.Id == item.Id {
-				item.Data = it.Data
-				item.Price = it.Price
-				break
-			}
-		}
-	}
 	deliveryOption, er := resolveDeliveryOption(order.Data.DeliveryOption.Id)
 	if er != nil {
 		log.Println(er)

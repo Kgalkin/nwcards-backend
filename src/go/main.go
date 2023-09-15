@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
@@ -17,6 +16,7 @@ import (
 	"nwcards-backend/src/go/models/db"
 	"nwcards-backend/src/go/payments"
 	"nwcards-backend/src/go/props"
+	"nwcards-backend/src/go/service"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -70,6 +70,23 @@ func getMenu(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, string(resp))
 }
 
+func getBonuses(w http.ResponseWriter, r *http.Request) {
+	enableCors(w)
+	bonuses, er := db.GetBonuses()
+	if er != nil {
+		log.Println(er)
+		http.Error(w, er.Error(), http.StatusBadRequest)
+		return
+	}
+	resp, er := json.Marshal(bonuses)
+	if er != nil {
+		log.Println(er)
+		http.Error(w, er.Error(), http.StatusBadRequest)
+		return
+	}
+	fmt.Fprintf(w, string(resp))
+}
+
 func createOrder(w http.ResponseWriter, r *http.Request) {
 	enableCors(w)
 	appJson(w)
@@ -84,22 +101,29 @@ func createOrder(w http.ResponseWriter, r *http.Request) {
 	}
 	order.Data.Email = strings.TrimSpace(order.Data.Email)
 
-	for _, item := range order.Data.Items {
-		dbItem, er := db.GetItem(item.Id)
-		if er != nil {
-			newEr := errors.New(er.Error() + fmt.Sprintf("\nOn item number: %d\n", item.Id))
-			log.Println(newEr)
-			http.Error(w, newEr.Error(), http.StatusConflict)
-			return
-		}
-		if dbItem.InStock < item.Count {
-			message := fmt.Sprintf("Instock < count for item {id: %d,title: %s, count: %d, instock: %d}",
-				item.Id, dbItem.Data.Title, item.Count, dbItem.InStock)
-			log.Println(message)
-			http.Error(w, message, http.StatusConflict)
+	//bonuses, er := db.GetBonusesByIds([]string{""})
+	bonuses, er := db.GetBonuses()
+
+	if er != nil {
+		log.Println(er)
+		http.Error(w, er.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	activeBonuses := []*db.Bonus{}
+	for _, bonus := range bonuses {
+		if bonus.IsGlobal {
+			activeBonuses = append(activeBonuses, bonus)
 		}
 	}
 
+	er = service.AdjustOrder(&order, activeBonuses)
+
+	if er != nil {
+		log.Println(er)
+		http.Error(w, er.Error(), http.StatusInternalServerError)
+		return
+	}
 	created, er := db.CreateOrder(order)
 	if er != nil {
 		log.Println(er)
@@ -785,6 +809,7 @@ func main() {
 	router.HandleFunc("/api/tags", createTag).Methods(http.MethodPost)
 	router.HandleFunc("/api/tags", getTags).Methods(http.MethodGet)
 	router.HandleFunc("/api/menu", getMenu).Methods(http.MethodGet)
+	router.HandleFunc("/api/bonuses", getBonuses).Methods(http.MethodGet)
 	router.HandleFunc("/api/login", login).Methods(http.MethodGet)
 	router.HandleFunc("/api/deliveryOptions", getDeliveryOptions).Methods(http.MethodGet)
 	router.HandleFunc("/api/handlepaymentresult", handlePayment)

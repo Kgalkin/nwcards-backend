@@ -54,8 +54,14 @@ func (id *StoreItemData) String() string {
 }
 
 func UpdateItemCount(item OrderItem) error {
+	var count int
+	if item.Type == ITEM_WRAPPER_TYPE {
+		count = int(item.Props["countToWrap"].(float64)) * item.Count
+	} else {
+		count = item.Count
+	}
 	_, er := db.Exec("UPDATE store_items SET instock = instock - $1 WHERE id = $2",
-		item.Count, item.Id)
+		count, item.Id)
 	if er != nil {
 		log.Println(er)
 		return er

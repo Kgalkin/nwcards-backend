@@ -10,7 +10,7 @@ import (
 type Tag struct {
 	Value    string `json:"value"`
 	Id       int64  `json:"id"`
-	IsSystem bool   `json:"isSystem,omitempty""`
+	IsSystem bool   `json:"isSystem,omitempty"`
 	Data     Map    `json:"data,omitempty"`
 }
 
