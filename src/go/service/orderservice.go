@@ -30,7 +30,7 @@ func processItemWrapperBonus(order *db.Order, bonus map[string]interface{}) {
 	newPriceOf := int(bonus["newPriceOf"].(float64))
 	for i := 0; i < len(order.Data.Items); i++ {
 		item := &order.Data.Items[i]
-		if containsOneOf(item.Tags, bonusTags) && item.Count > countToWrap {
+		if containsOneOf(item.Tags, bonusTags) && item.Count >= countToWrap {
 			wrapperCount := item.Count / countToWrap
 			item.Count = item.Count % countToWrap
 			newItem := db.OrderItem{

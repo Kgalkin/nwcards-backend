@@ -816,19 +816,23 @@ func main() {
 	router.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) { enableCors(w) }).Methods(http.MethodOptions)
 	router.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./view/index.html") }).Methods(http.MethodGet)
 
-	redirect := func(w http.ResponseWriter, req *http.Request) {
-		if req.Method == http.MethodGet {
-			http.Redirect(w, req,
-				"https://"+req.Host+req.URL.String(),
-				http.StatusMovedPermanently)
-		} else {
-			http.Error(w, "Not found", http.StatusNotFound)
+	if props.Get()["https.disabled"] != nil {
+		http.ListenAndServe(props.Get()["api.host.address"].(string)+":8080", router)
+	} else {
+		redirect := func(w http.ResponseWriter, req *http.Request) {
+			if req.Method == http.MethodGet {
+				http.Redirect(w, req,
+					"https://"+req.Host+req.URL.String(),
+					http.StatusMovedPermanently)
+			} else {
+				http.Error(w, "Not found", http.StatusNotFound)
+			}
 		}
+		go http.ListenAndServe(props.Get()["api.host.address"].(string)+":8080", http.HandlerFunc(redirect))
+		log.Fatal(http.ListenAndServeTLS(props.Get()["api.host.address"].(string)+":443",
+			"certs/certificate.crt",
+			"certs/key.pem",
+			router))
 	}
-	go http.ListenAndServe(props.Get()["api.host.address"].(string)+":8080", http.HandlerFunc(redirect))
-	log.Fatal(http.ListenAndServeTLS(props.Get()["api.host.address"].(string)+":443",
-		"certs/certificate.crt",
-		"certs/key.pem",
-		router))
 
 }
