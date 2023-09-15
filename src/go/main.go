@@ -688,7 +688,7 @@ func authChecker(w http.ResponseWriter, r *http.Request) bool {
 
 func enableCors(w http.ResponseWriter) {
 	if props.Get()["api.cors.enabled"].(bool) {
-		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:9090")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "PUT,POST,GET,DELETE,OPTIONS,PATCH")
 		w.Header().Set("Access-Control-Allow-Headers", "*")
 	}
