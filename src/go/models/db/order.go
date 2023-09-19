@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 )
 
@@ -182,7 +183,8 @@ func UpdateOrderStateData(id int, state string, data *OrderData) error {
 		if len(update) > 0 {
 			update += ", "
 		}
-		update += fmt.Sprintf("data = '%s'", data.String())
+		update += fmt.Sprintf("data = '%s'",
+			strings.Replace(data.String(), "'", "''", -1))
 	}
 	if len(update) > 0 && id > 0 {
 		_, er := db.Exec("UPDATE orders SET "+update+" WHERE id = $1", id)
