@@ -2,7 +2,6 @@ package db
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"log"
 )
@@ -12,16 +11,6 @@ type Tag struct {
 	Id       int64  `json:"id"`
 	IsSystem bool   `json:"isSystem,omitempty"`
 	Data     Map    `json:"data,omitempty"`
-}
-
-type Map map[string]interface{}
-
-func (data *Map) Scan(src interface{}) error {
-	uintVal, ok := src.([]uint8)
-	if !ok {
-		return nil
-	}
-	return json.Unmarshal(uintVal, data)
 }
 
 func GetTags(params map[string][]string) ([]*Tag, error) {

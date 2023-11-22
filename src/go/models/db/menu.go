@@ -1,10 +1,8 @@
 package db
 
-import "github.com/lib/pq"
-
 type MenuItem struct {
 	Name string  `json:"name"`
-	Tags []int64 `json:"tags"`
+	Data Map `json:"data"`
 }
 
 func GetMenuItems() ([]*MenuItem, error) {
@@ -16,7 +14,7 @@ func GetMenuItems() ([]*MenuItem, error) {
 	defer rows.Close()
 	for rows.Next() {
 		item := new(MenuItem)
-		er = rows.Scan(&item.Name, pq.Array(&item.Tags))
+		er = rows.Scan(&item.Name, &item.Data)
 		if er != nil {
 			return nil, er
 		}
