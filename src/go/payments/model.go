@@ -1,8 +1,7 @@
 package payments
 
 import (
-	"crypto/sha1"
-	"encoding/hex"
+	"crypto/sha256"
 	"fmt"
 	"nwcards-backend/src/go/models/db"
 	"nwcards-backend/src/go/props"
@@ -183,11 +182,5 @@ func (i *InitRequest) generateToken() {
 		strconv.Itoa(i.OrderId) +
 		props.Get()["payment.token.pss"].(string) +
 		i.TerminalKey
-	i.Token = sha256(str)
-}
-
-func sha256(str string) string {
-	hasher := sha1.New()
-	hasher.Write([]byte(str))
-	return hex.EncodeToString(hasher.Sum(nil))
+	i.Token = fmt.Sprintf("%x", sha256.Sum256([]byte(str)))
 }
