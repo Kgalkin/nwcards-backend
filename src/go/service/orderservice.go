@@ -88,7 +88,7 @@ func fillOrder(order *db.Order) error {
 		}
 		ids += strconv.FormatInt(item.Id, 10)
 	}
-	items, er := db.GetItems(map[string][]string{"ids": {ids}})
+	items, er := db.GetItems(map[string][]string{"ids": {ids}, "size": {strconv.Itoa(len(order.Data.Items) + 1)}})
 	if er != nil {
 		log.Println(er)
 		return er

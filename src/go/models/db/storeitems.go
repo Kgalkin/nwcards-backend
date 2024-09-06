@@ -199,7 +199,7 @@ func GetItems(params map[string][]string) (*StoreItemsPage, error) {
 
 func paramsToDbRequest(params map[string][]string) (string, string, int64) {
 	where := ""
-	limit := "200"
+	limit := "100"
 	size := params["size"]
 	if len(size) > 0 {
 		limit = size[0]
