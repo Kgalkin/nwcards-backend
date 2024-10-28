@@ -211,10 +211,12 @@ func viewOrderByUUID(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, er.Error(), http.StatusInternalServerError)
 		return
 	}
-	order.Data.Name = ""
-	order.Data.Address = ""
-	order.Data.Email = ""
-	order.Data.Index = ""
+	if order.State != db.CREATED {
+		order.Data.Name = ""
+		order.Data.Address = ""
+		order.Data.Email = ""
+		order.Data.Index = ""
+	}
 	resp, er := json.Marshal(order)
 	if er != nil {
 		log.Println(er)
@@ -459,7 +461,7 @@ func getOrders(w http.ResponseWriter, r *http.Request) {
 	}
 	enableCors(w)
 	appJson(w)
-	orders, err := db.GetOrders()
+	orders, err := db.GetOrders(r.URL.Query())
 	if err != nil {
 		log.Println(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -791,6 +793,7 @@ func main() {
 			time.Sleep(5 * time.Second)
 		}
 	}()
+
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	router := mux.NewRouter()
@@ -817,7 +820,10 @@ func main() {
 	router.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./view/index.html") }).Methods(http.MethodGet)
 
 	if props.Get()["https.disabled"] != nil {
-		http.ListenAndServe(props.Get()["api.host.address"].(string)+":8080", router)
+		err := http.ListenAndServe(props.Get()["api.host.address"].(string)+":8080", router)
+		if err != nil {
+			log.Fatal(err)
+		}
 	} else {
 		redirect := func(w http.ResponseWriter, req *http.Request) {
 			if req.Method == http.MethodGet {
@@ -828,7 +834,12 @@ func main() {
 				http.Error(w, "Not found", http.StatusNotFound)
 			}
 		}
-		go http.ListenAndServe(props.Get()["api.host.address"].(string)+":8080", http.HandlerFunc(redirect))
+		go func() {
+			err := http.ListenAndServe(props.Get()["api.host.address"].(string)+":8080", http.HandlerFunc(redirect))
+			if err != nil {
+				log.Fatal(err)
+			}
+		}()
 		log.Fatal(http.ListenAndServeTLS(props.Get()["api.host.address"].(string)+":443",
 			"certs/certificate.crt",
 			"certs/key.pem",

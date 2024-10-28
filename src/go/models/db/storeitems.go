@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"github.com/lib/pq"
 	"log"
-	"strconv"
 )
 
 type StoreItemData struct {
@@ -162,7 +161,7 @@ func CreateItem(i StoreItem) (*StoreItem, error) {
 }
 
 func GetItems(params map[string][]string) (*StoreItemsPage, error) {
-	query, whereQuery, offset := paramsToDbRequest(params)
+	query, whereQuery, offset := ParamsToDbRequest(params, "ORDER BY (instock > 0) desc, id desc")
 	rows, err := db.Query("SELECT * FROM store_items" +
 		query)
 	if err != nil {
@@ -195,51 +194,6 @@ func GetItems(params map[string][]string) (*StoreItemsPage, error) {
 		return nil, err
 	}
 	return &sip, nil
-}
-
-func paramsToDbRequest(params map[string][]string) (string, string, int64) {
-	where := ""
-	limit := "100"
-	size := params["size"]
-	if len(size) > 0 {
-		limit = size[0]
-	}
-	offset := "0"
-	offsetQuery := params["offset"]
-	if len(offsetQuery) > 0 {
-		offset = offsetQuery[0]
-	}
-	tags := params["tags"]
-	if len(tags) > 0 {
-		taglist := ""
-		for _, tag := range tags {
-			taglist += ", " + tag
-		}
-		method := "&&"
-		if m := params["tags.method"]; len(m) > 0 && m[0] == "and" {
-			method = "@>"
-		}
-		where = fmt.Sprintf("\nWHERE tags %s '{%s}'", method, taglist[2:])
-	}
-	ids := params["ids"]
-	if len(ids) > 0 {
-		word := "WHERE"
-		if where != "" {
-			word = "AND"
-		}
-		where += fmt.Sprintf("\n%s id in (%s)", word, ids[0])
-	}
-	offsetInt, err := strconv.ParseInt(offset, 10, 64)
-	if err != nil {
-		panic(err)
-	}
-	sizeInt, err := strconv.ParseInt(limit, 10, 64)
-	if err != nil {
-		panic(err)
-	}
-	return fmt.Sprintf("%s\nORDER BY (instock > 0) desc, id desc\nLIMIT %s\nOFFSET %s", where, limit, offset),
-		where,
-		offsetInt + sizeInt
 }
 
 func rowsToStoreItems(rows *sql.Rows) ([]*StoreItem, error) {

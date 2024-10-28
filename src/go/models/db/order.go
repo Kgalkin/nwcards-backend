@@ -104,8 +104,9 @@ func getStates() []string {
 		CANCELED}
 }
 
-func GetOrders() ([]*Order, error) {
-	rows, er := db.Query("SELECT * FROM orders ORDER BY created desc LIMIT 100")
+func GetOrders(params map[string][]string) ([]*Order, error) {
+	query, _, _ := ParamsToDbRequest(params, "ORDER BY created desc")
+	rows, er := db.Query("SELECT * FROM orders " + query)
 	if er != nil {
 		log.Println(er)
 		return nil, er
