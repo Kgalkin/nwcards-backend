@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/handlers"
@@ -834,16 +835,41 @@ func main() {
 				http.Error(w, "Not found", http.StatusNotFound)
 			}
 		}
+
 		go func() {
 			err := http.ListenAndServe(props.Get()["api.host.address"].(string)+":8080", http.HandlerFunc(redirect))
 			if err != nil {
 				log.Fatal(err)
 			}
 		}()
-		log.Fatal(http.ListenAndServeTLS(props.Get()["api.host.address"].(string)+":443",
-			"certs/certificate.crt",
-			"certs/key.pem",
-			router))
+		/*log.Fatal(http.ListenAndServeTLS(props.Get()["api.host.address"].(string)+":443",
+		"certs/certificate.crt",
+		"certs/key.pem",
+		router))*/
+		cfg := &tls.Config{MinVersion: tls.VersionTLS12}
+
+		cert, err := tls.LoadX509KeyPair("certs/certificate.crt", "certs/key.pem")
+		if err != nil {
+			log.Fatal(err)
+		}
+		//adding 1st Certificate (nw-cards.com)
+		cfg.Certificates = append(cfg.Certificates, cert)
+
+		cert, err = tls.LoadX509KeyPair("certs/certificate2.crt", "certs/key2.pem")
+		if err != nil {
+			log.Println(err)
+		} else {
+			//adding 2nd Certificate (nw-cards.ru)
+			cfg.Certificates = append(cfg.Certificates, cert)
+		}
+
+		server := &http.Server{
+			Addr:      props.Get()["api.host.address"].(string) + ":443",
+			Handler:   router,
+			TLSConfig: cfg}
+
+		fmt.Println("Starting https server")
+		log.Fatal(server.ListenAndServeTLS("", ""))
 	}
 
 }
