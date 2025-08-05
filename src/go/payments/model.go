@@ -160,7 +160,7 @@ func NewInitForm(order db.Order) *InitRequest {
 	amount += order.Data.DeliveryOption.Price
 	iForm.Amount = amount * 100
 	iForm.generateToken()
-	iForm.RedirectDueDate = Timestamp{time.Now().Add(time.Minute * time.Duration(20))}
+	iForm.RedirectDueDate = Timestamp{time.Now().Add(time.Hour * 24 * 3)}
 	return iForm
 }
 
