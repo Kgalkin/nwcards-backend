@@ -28,6 +28,7 @@ type Order struct {
 
 type OrderData struct {
 	Email          string         `json:"email"`
+	PhoneNumber    string         `json:"phoneNumber,omitempty"`
 	Index          string         `json:"index"`
 	Address        string         `json:"address"`
 	Name           string         `json:"name"`

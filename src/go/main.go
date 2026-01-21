@@ -4,9 +4,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/handlers"
-	"github.com/gorilla/mux"
-	"github.com/h2non/bimg"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -23,6 +20,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/gorilla/handlers"
+	"github.com/gorilla/mux"
+	"github.com/h2non/bimg"
 )
 
 //public routes
@@ -826,7 +827,7 @@ func main() {
 			log.Fatal(err)
 		}
 	} else {
-		redirect := func(w http.ResponseWriter, req *http.Request) {
+		/*redirect := func(w http.ResponseWriter, req *http.Request) {
 			if req.Method == http.MethodGet {
 				http.Redirect(w, req,
 					"https://"+req.Host+req.URL.String(),
@@ -834,10 +835,10 @@ func main() {
 			} else {
 				http.Error(w, "Not found", http.StatusNotFound)
 			}
-		}
+		}*/
 
 		go func() {
-			err := http.ListenAndServe(props.Get()["api.host.address"].(string)+":8080", http.HandlerFunc(redirect))
+			err := http.ListenAndServe(props.Get()["api.host.address"].(string)+":8080", router)
 			if err != nil {
 				log.Fatal(err)
 			}

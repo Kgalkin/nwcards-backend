@@ -14,8 +14,9 @@ type DeliveryOption struct {
 }
 
 type DeliveryData struct {
-	Description string               `json:"description,omitempty"`
-	Constraints []DeliveryConstraint `json:"constraints,omitempty"`
+	Description            string               `json:"description,omitempty"`
+	Constraints            []DeliveryConstraint `json:"constraints,omitempty"`
+	AdditionalRequirements []string             `json:"additionalRequirements,omitempty"`
 }
 
 type DeliveryConstraint struct {
