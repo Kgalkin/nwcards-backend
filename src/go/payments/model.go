@@ -139,13 +139,14 @@ func NewInitForm(order db.Order) *InitRequest {
 	iForm.Receipt.Taxation = "usn_income"
 	iForm.Receipt.EmailCompany = props.Get()["company.email"].(string)
 	numberOfItems := len(order.Data.Items)
-	if order.Data.DeliveryOption.Price > 0 {
+	deliveryPrice := order.Data.GetDeliveryPrice()
+	if deliveryPrice > 0 {
 		iForm.Receipt.Items = make([]Item, numberOfItems+1)
 		iForm.Receipt.Items[numberOfItems] = Item{
 			Name:          order.Data.DeliveryOption.Description,
 			Quantity:      1,
-			Amount:        order.Data.DeliveryOption.Price * 100,
-			Price:         order.Data.DeliveryOption.Price * 100,
+			Amount:        deliveryPrice * 100,
+			Price:         deliveryPrice * 100,
 			PaymentMethod: "full_prepayment",
 			PaymentObject: "commodity",
 			Tax:           "none"}

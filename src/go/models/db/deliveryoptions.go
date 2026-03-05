@@ -8,17 +8,38 @@ import (
 
 type DeliveryOption struct {
 	Description string       `json:"description"`
-	Price       int          `json:"price"`
+	Price       int          `json:"price,omitempty"`
 	Id          int          `json:"id"`
 	Data        DeliveryData `json:"data,omitempty"`
 }
 
 type DeliveryData struct {
-	Description            string               `json:"description,omitempty"`
-	Constraints            []DeliveryConstraint `json:"constraints,omitempty"`
-	AdditionalRequirements []string             `json:"additionalRequirements,omitempty"`
+	Description            string                  `json:"description,omitempty"`
+	Constraints            []DeliveryConstraint    `json:"constraints,omitempty"`
+	AdditionalRequirements []AdditionalRequirement `json:"additionalRequirements,omitempty"`
+	PriceRequest           bool                    `json:"priceRequest,omitempty"`
+	PriceModifiers         []PriceModifier         `json:"priceModifiers,omitempty"`
 }
 
+type AdditionalRequirement struct {
+	Type        string   `json:"type"`
+	Values      []string `json:"values"`
+	Disabled    bool     `json:"disabled,omitempty"`
+	Placeholder string   `json:"placeholder,omitempty"`
+	Description string   `json:"description,omitempty"`
+}
+
+type PriceModifier struct {
+	Type        string       `json:"type"`
+	Value       string       `json:"value"`
+	Order       string       `json:"priority"`
+	Constraints []Constraint `json:"constraints"`
+}
+
+type Constraint struct {
+	Type  string `json:"type"`
+	Value string `json:"value"`
+}
 type DeliveryConstraint struct {
 	Type         string `json:"type,omitempty"`
 	Max          int    `json:"max,omitempty"`
@@ -46,7 +67,7 @@ func (data *DeliveryData) Scan(src interface{}) error {
 	return json.Unmarshal(uintVal, data)
 }
 
-func resolveDeliveryOption(id int) (*DeliveryOption, error) {
+func ResolveDeliveryOption(id int) (*DeliveryOption, error) {
 	rows, er := db.Query("SELECT * FROM delivery_options WHERE id = $1", id)
 	if er != nil {
 		log.Println(er)

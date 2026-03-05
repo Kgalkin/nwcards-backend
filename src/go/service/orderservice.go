@@ -4,23 +4,67 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"nwcards-backend/src/go/client/ya"
 	"nwcards-backend/src/go/models/db"
 	"strconv"
 )
 
-func AdjustOrder(order *db.Order, bonuses []*db.Bonus) error {
-	er := fillOrder(order)
+func AdjustOrder(order *db.Order) error {
+	er := FillOrder(order)
 	if er != nil {
 		log.Println(er)
 		return er
 	}
-	if bonuses != nil {
-		for _, bonus := range bonuses {
+
+	//bonuses, er := db.GetBonusesByIds([]string{""})
+	bonuses, er := db.GetBonuses()
+
+	if er != nil {
+		log.Println(er)
+		return er
+	}
+
+	activeBonuses := []*db.Bonus{}
+	for _, bonus := range bonuses {
+		if bonus.IsGlobal {
+			activeBonuses = append(activeBonuses, bonus)
+		}
+	}
+
+	if activeBonuses != nil {
+		for _, bonus := range activeBonuses {
 			if bonus.Type == db.ITEM_WRAPPER_TYPE {
 				processItemWrapperBonus(order, bonus.Data)
 			}
 		}
 	}
+
+	deliveryOption, er := db.ResolveDeliveryOption(order.Data.DeliveryOption.Id)
+	if er != nil {
+		log.Println(er)
+		return er
+	}
+	order.Data.DeliveryOption = *deliveryOption
+	if deliveryOption.Id == 7 { //if yandex delivery
+		pr, er := ya.NewPriceRequest(*order)
+		if er != nil {
+			log.Println(er)
+			return er
+		}
+		priceResponse, er := ya.GetPrice(*pr)
+		if er != nil {
+			log.Println(er)
+			return er
+		}
+		order.Data.DeliveryPrice, er = priceResponse.IntPrice()
+		if er != nil {
+			log.Println(er)
+			return er
+		}
+	} else {
+		order.Data.DeliveryPrice = deliveryOption.Price
+	}
+	order.ApplyDeliveryPriceModifiers()
 	return nil
 }
 
@@ -80,7 +124,7 @@ func containsOneOf(slice []int64, otherSlice []int64) bool {
 	return false
 }
 
-func fillOrder(order *db.Order) error {
+func FillOrder(order *db.Order) error {
 	ids := ""
 	for i, item := range order.Data.Items {
 		if i > 0 {

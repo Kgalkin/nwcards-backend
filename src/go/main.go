@@ -103,23 +103,7 @@ func createOrder(w http.ResponseWriter, r *http.Request) {
 	}
 	order.Data.Email = strings.TrimSpace(order.Data.Email)
 
-	//bonuses, er := db.GetBonusesByIds([]string{""})
-	bonuses, er := db.GetBonuses()
-
-	if er != nil {
-		log.Println(er)
-		http.Error(w, er.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	activeBonuses := []*db.Bonus{}
-	for _, bonus := range bonuses {
-		if bonus.IsGlobal {
-			activeBonuses = append(activeBonuses, bonus)
-		}
-	}
-
-	er = service.AdjustOrder(&order, activeBonuses)
+	er = service.AdjustOrder(&order)
 
 	if er != nil {
 		log.Println(er)
@@ -170,6 +154,28 @@ func createOrder(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+}
+
+func checkDeliveryPrice(w http.ResponseWriter, r *http.Request) {
+	enableCors(w)
+	appJson(w)
+	order := db.Order{}
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	er := decoder.Decode(&order)
+	if er != nil {
+		log.Println(er)
+		http.Error(w, er.Error(), http.StatusInternalServerError)
+		return
+	}
+	er = service.AdjustOrder(&order)
+	resp, er := json.Marshal(order)
+	if er != nil {
+		log.Println(er)
+		http.Error(w, er.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Write(resp)
 }
 
 func checkSimplePost(order db.Order) error {
@@ -807,6 +813,7 @@ func main() {
 	router.HandleFunc("/api/items/{id}", updateItem).Methods(http.MethodPatch)
 	router.HandleFunc("/api/items/{id}/image/cover", updateCoverImage).Methods(http.MethodPatch)
 	router.HandleFunc("/api/orders", createOrder).Methods(http.MethodPost)
+	router.HandleFunc("/api/orders/checkdeliveryprice", checkDeliveryPrice).Methods(http.MethodPost)
 	router.HandleFunc("/api/orders/{uuid}", viewOrderByUUID).Methods(http.MethodGet)
 	router.HandleFunc("/api/orders/{id}", updateOrder).Methods(http.MethodPatch)
 	router.HandleFunc("/api/orders/{id}/requestPayment", requestPayment).Methods(http.MethodGet)

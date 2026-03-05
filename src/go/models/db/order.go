@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -32,6 +34,9 @@ type OrderData struct {
 	Index          string         `json:"index"`
 	Address        string         `json:"address"`
 	Name           string         `json:"name"`
+	PvzId          string         `json:"pvzId,omitempty"`
+	PvzAddress     string         `json:"pvzAddress,omitempty"`
+	DeliveryPrice  int            `json:"deliveryPrice,omitempty"`
 	DeliveryOption DeliveryOption `json:"deliveryOption"`
 	PostalCode     string         `json:"postalCode"`
 	Items          []OrderItem    `json:"items"`
@@ -42,6 +47,14 @@ type OrderData struct {
 		Proof string   `json:"proof"`
 		Other []string `json:"other"`
 	} `json:"links"`
+}
+
+func (o *OrderData) GetDeliveryPrice() int {
+	deliveryPrice := o.DeliveryPrice
+	if deliveryPrice == 0 {
+		deliveryPrice = o.DeliveryOption.Price
+	}
+	return deliveryPrice
 }
 
 type Error struct {
@@ -266,16 +279,15 @@ func GetOrderByUUID(uuid string) (*Order, error) {
 }
 
 func CreateOrder(order Order) (*Order, error) {
-	deliveryOption, er := resolveDeliveryOption(order.Data.DeliveryOption.Id)
-	if er != nil {
-		log.Println(er)
-		return nil, er
-	}
-	order.Data.DeliveryOption = *deliveryOption
 	data, er := json.Marshal(order.Data)
 	if er != nil {
 		log.Println(er)
 		return nil, er
+	}
+	if order.Data.DeliveryPrice == 0 {
+		if order.Data.DeliveryOption.Price != 0 && order.Data.DeliveryOption.Price > 0 {
+			order.Data.DeliveryPrice = order.Data.DeliveryOption.Price
+		}
 	}
 	rows, er := db.Query("INSERT INTO orders (data) VALUES ($1) RETURNING *", data)
 	if er != nil {
@@ -294,4 +306,49 @@ func CreateOrder(order Order) (*Order, error) {
 		return nil, er
 	}
 	return orders[0], nil
+}
+
+func (o *Order) ApplyDeliveryPriceModifiers() {
+	price := o.Data.GetDeliveryPrice()
+	if o.Data.DeliveryOption.Data.PriceModifiers != nil &&
+		len(o.Data.DeliveryOption.Data.PriceModifiers) > 0 {
+		for _, pm := range o.Data.DeliveryOption.Data.PriceModifiers {
+			if o.isApplicable(pm.Constraints) {
+				if pm.Type == "plus" {
+					plus, _ := strconv.Atoi(pm.Value)
+					price += plus
+				}
+				if pm.Type == "%" {
+					percent, _ := strconv.ParseFloat(pm.Value, 32)
+					price = int(math.Floor(float64(price)*percent) / float64(100))
+				}
+			}
+		}
+	}
+	o.Data.DeliveryPrice = price
+}
+
+func (o *Order) isApplicable(cs []Constraint) bool {
+	if cs == nil || len(cs) == 0 {
+		return true
+	}
+	result := true
+	for _, c := range cs {
+		if c.Type == "orderPriceMin" {
+			value, _ := strconv.Atoi(c.Value)
+			result = result && (value <= o.getItemsPrice())
+		}
+	}
+	return result
+}
+
+func (o *Order) getItemsPrice() int {
+	price := 0
+	if o.Data.Items != nil &&
+		len(o.Data.Items) > 0 {
+		for _, item := range o.Data.Items {
+			price = price + item.Price*item.Count
+		}
+	}
+	return price
 }
