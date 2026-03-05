@@ -22,11 +22,12 @@ type DeliveryData struct {
 }
 
 type AdditionalRequirement struct {
-	Type        string   `json:"type"`
-	Values      []string `json:"values"`
-	Disabled    bool     `json:"disabled,omitempty"`
-	Placeholder string   `json:"placeholder,omitempty"`
-	Description string   `json:"description,omitempty"`
+	Type        string            `json:"type"`
+	Values      []string          `json:"values"`
+	Disabled    bool              `json:"disabled,omitempty"`
+	Placeholder string            `json:"placeholder,omitempty"`
+	Description string            `json:"description,omitempty"`
+	LabelStyle  map[string]string `json:"labelStyle,omitempty"`
 }
 
 type PriceModifier struct {
