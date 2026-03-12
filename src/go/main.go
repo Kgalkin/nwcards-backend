@@ -557,7 +557,7 @@ func handlePatchOrder(id int, r *http.Request) error {
 				log.Println(er)
 				return er
 			}
-			order.Data.DeliveryOption.Price = price
+			order.Data.DeliveryPrice = price
 			er = db.UpdateOrderStateData(id, "", &order.Data)
 			if er != nil {
 				log.Println(er)
@@ -601,9 +601,8 @@ func handlePatchOrder(id int, r *http.Request) error {
 				fmt.Sprintf("ваш заказ отправлен из магазина %s", props.Get()["site.host"].(string)),
 				fmt.Sprintf(
 					`Здравствуйте! Ваш %[1]s из магазина North Wind Cards отправлен.<br/>
-Вы можете отслеживать отправку с помощью трекера на <a href="https://www.pochta.ru/tracking#%[2]s">сайте Почты России</a> или в приложении Почты России.<br/> 
-Попутного ветра!<br/>
-%[2]s<br/><br/>
+Вы можете отслеживать отправку с помощью трекера %[2]s<br/> 
+Попутного ветра!<br/><br/>
 
 Будем благодарны за оставленный отзыв &#128144;<br/>
 <a href="https://vk.com/topic-182017496_46570052">Оставить отзыв</a>`,
