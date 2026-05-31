@@ -169,6 +169,11 @@ func checkDeliveryPrice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	er = service.AdjustOrder(&order)
+	if er != nil {
+		log.Println(er)
+		http.Error(w, er.Error(), http.StatusInternalServerError)
+		return
+	}
 	resp, er := json.Marshal(order)
 	if er != nil {
 		log.Println(er)
