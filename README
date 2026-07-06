@@ -1,0 +1,137 @@
+initdb -U postgres -A password -E utf8 -W -D POSTGRESQL_ROOT\data
+The command line parameters of the initdb command are described in following:
+
+-U postgres means that the superuser account of your database is called ‘postgres’.
+-A password means that password authentication is used.
+-E utf8 means that the default encoding will be UTF-8.
+-W means that you will enter the superuser password manually.
+-D POSTGRESQL_ROOT\data specifies the data directory of your PostgreSQL installation.
+
+pg_ctl -D C:\Users\kgalkin\POSTGRESQL_ROOT\data -l  C:\Users\kgalkin\POSTGRESQL_ROOT\log start
+
+GMAIL app-pass https://security.google.com/settings/security/apppasswords
+
+image compression https://github.com/h2non/bimg
+
+/*GENERATE LOCALHOST SELF_SIGNED SSL*/
+openssl req -x509 -sha256 -nodes -newkey rsa:2048 -days 365 -keyout localhost.key -out localhost.crt
+
+
+ALTER SEQUENCE store_items_id_seq RESTART
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp"; //add extension
+uuid_generate_v1()
+
+***************
+bundle 14
+***************
+1 ALTER TABLE public.tags ADD "data" jsonb NULL; ({"speciality": "postcard", "simplePostCount": 1})
+2 ALTER TABLE public.delivery_options ADD "data" jsonb NULL;
+
+***********
+bundle 15
+**************
+ALTER TABLE public.store_items ADD old_price int4 NULL DEFAULT 0;
+
+**************************
+bundle 16
+**************************
+delivery_options 1 =>
+                   {
+                     "constraints": [
+                       {
+                         "max": 15,
+                         "text": "Доступно только для заказов из 15(или меньше) открыток",
+                         "type": "tagData",
+                         "fieldName": "simplePostCount",
+                         >>>>"failOnAbsent": true<<<<<
+                       }
+                     ]
+                   }
+
+delivery_option 5
+INSERT INTO public.delivery_options (description,price,id,"data") VALUES
+	 ('Заказная бандероль (в коробке)',185,5,'{"description":"Упаковка заказа в коробку - это дополнительная супер-защита открыточек от повреждений во время транспортировки и просто красота.", "constraints": [{"max": -1, "type": "tagData", "fieldName": "notInBox", "failOnAbsent": false}, {"min": 500, "type": "totalPrice"}]}');
+
+для тэгов выключенных из доставки в коробке:
+{"notInBox": 1}
+
+
+***************************************************
+new tag behaviour - allowCountOnPrice
+ALTER TABLE public.tags  add column "is_system" BOOLEAN DEFAULT FALSE
+
+
+*******************************
+SELECT *, count(*) OVER() AS full_count
+FROM   tbl
+WHERE  /* whatever */
+ORDER  BY col1
+OFFSET ?
+LIMIT  ?
+******************
+
+https://www.tinkoff.ru/kassa/develop/api/payments/init-request/
+
+NewRequest("POST", url, bytes.NewBuffer(qsStrData))
+
+on Ubuntu cd to git repo
+add props.json
+go run ./src/go/main.go
+
+*******************
+FOR RUNNING UN LINUX
+export CGO_CFLAGS_ALLOW=-Xpreprocessor
+
+*********************************
+SOLD SCRIPT
+select res.title, sum(res.count) from
+(select to_jsonb(item) ->'jsonb_array_elements'->'data'->>'title' as "title",  CAST((to_jsonb(item)->'jsonb_array_elements'->>'count') AS INT) as "count"
+from (SELECT jsonb_array_elements(data->'items') FROM orders where created >= '2022-12-01' and state = 'sent_to_customer') as item) as res group by 1 order by 2 desc
+
+
+//TLS 1.2 +
+server := &http.Server{
+		Addr:      props.Get()["api.host.address"].(string) + ":443",
+		Handler:   router,
+		TLSConfig: &tls.Config{MinVersion: tls.VersionTLS12}}
+	go http.ListenAndServe(props.Get()["api.host.address"].(string)+":8080", http.HandlerFunc(redirect))
+	log.Fatal(server.ListenAndServeTLS( /*props.Get()["api.host.address"].(string)+":443",*/
+		"certs/certificate.crt",
+		"certs/key.pem", /*,
+		router*/))
+
+//item Wrapper
+{
+  ""
+}
+
+CREATE TABLE public.bonuses (
+	id text NOT NULL,
+	state text NOT NULL DEFAULT 'Active'::text,
+	is_global bool NOT NULL DEFAULT false,
+	"data" jsonb NULL,
+	"type" text NULL
+);
+
+INSERT INTO public.bonuses (id,state,isglobal,"data","type") VALUES
+	 ('10as7','Active',true,'{"tags": [1], "hexColor": "#d1efd5", "newPriceOf": 7, "countToWrap": 10}','itemWrapper');
+
+
+=========================================
+add data to menu
+
+alter TABLE menu add column "data" jsonb
+update menu set "data" = jsonb_build_object('tags', jsonb_build_array(tags)->0)
+
+alter table menu drop column tags
+
+INSERT INTO public.menu ("name","data") VALUES
+	 ('Новый Год','{"tags": [30, 50], "styles": {"color": "#f0c398", "background-color": "#13161b"}, "tagsMethod": "or"}');
+
+
+INSERT INTO public.delivery_options (description,price,id,"data") VALUES
+	 ('Бесплатная доставка',0,3,'{"constraints": [{"min": 2000, "type": "totalPrice", "priority": 1}]}');
+
+update orders set data = jsonb_set(data, '{deliveryPrice}', data -> 'deliveryOption' -> 'price')
+update orders set data = data #- array['deliveryOption', 'data']
+
