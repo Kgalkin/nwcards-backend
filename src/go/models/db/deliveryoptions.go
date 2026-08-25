@@ -28,6 +28,7 @@ type AdditionalRequirement struct {
 	Placeholder string            `json:"placeholder,omitempty"`
 	Description string            `json:"description,omitempty"`
 	LabelStyle  map[string]string `json:"labelStyle,omitempty"`
+	Identifiers map[string]string `json:"identifiers,omitempty"`
 }
 
 type PriceModifier struct {
@@ -74,6 +75,9 @@ func ResolveDeliveryOption(id int) (*DeliveryOption, error) {
 		log.Println(er)
 		return nil, er
 	}
+	if er = rows.Err(); er != nil {
+		return nil, er
+	}
 	defer rows.Close()
 	options := make([]*DeliveryOption, 0)
 	for rows.Next() {
@@ -95,6 +99,9 @@ func GetDeliveryOptions() ([]*DeliveryOption, error) {
 	rows, er := db.Query("SELECT * FROM delivery_options")
 	if er != nil {
 		log.Println(er)
+		return nil, er
+	}
+	if er = rows.Err(); er != nil {
 		return nil, er
 	}
 	defer rows.Close()

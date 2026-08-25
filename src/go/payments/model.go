@@ -14,7 +14,7 @@ type Timestamp struct {
 }
 
 func (t Timestamp) MarshalJSON() ([]byte, error) {
-	return []byte(fmt.Sprintf("\"%s\"", t.Format("2006-01-02T15:04:05-07:00"))), nil
+	return fmt.Appendf(nil, "\"%s\"", t.Format("2006-01-02T15:04:05-07:00")), nil
 }
 
 type InitResponse struct {

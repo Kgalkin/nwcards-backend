@@ -3,7 +3,6 @@ package db
 import (
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/lib/pq"
 	"log"
@@ -119,7 +118,7 @@ func checkTags(tags []int64) error {
 			}
 		}
 		if !result {
-			return errors.New(fmt.Sprintf("No tag found, id: %d", actTag))
+			return fmt.Errorf("No tag found, id: %d", actTag)
 		}
 	}
 	return nil
@@ -189,10 +188,6 @@ func GetItems(params map[string][]string) (*StoreItemsPage, error) {
 		return nil, err
 	}
 	sip.NextOffset = offset
-	if err != nil {
-		log.Println(err)
-		return nil, err
-	}
 	return &sip, nil
 }
 

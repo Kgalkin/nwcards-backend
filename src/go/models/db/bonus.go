@@ -45,6 +45,7 @@ func getBonusesFromQuery(query string) ([]*Bonus, error) {
 		return nil, er
 	}
 	defer rows.Close()
+	rows.Err()
 	bonuses := make([]*Bonus, 0)
 	for rows.Next() {
 		bonus := new(Bonus)

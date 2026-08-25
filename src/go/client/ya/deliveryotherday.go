@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"math"
 	"net/http"
@@ -36,6 +37,8 @@ func GetPrice(request PriceRequest) (*PriceResponse, error) {
 			"error checking yandex delivery price. code: %d, destination id: %s\n",
 			response.StatusCode, request.Destination.PlatformStationId)
 		log.Println(er)
+		message, _ := io.ReadAll(response.Body)
+		log.Println(string(message))
 		return nil, er
 	}
 	priceResponse := PriceResponse{}
@@ -92,13 +95,13 @@ func (p PriceResponse) IntPrice() (int, error) {
 	return int(math.Ceil(fl)), nil
 }
 
-func NewPriceRequest(order db.Order) (*PriceRequest, error) {
+func NewPriceRequest(order db.Order, sourcePvzId string) (*PriceRequest, error) {
 	if order.Data.PvzId == "" {
 		return nil, fmt.Errorf("PvzId can not be null")
 	}
 	priceRequest := new(PriceRequest)
 	source := new(Destination)
-	source.PlatformStationId = props.Get()["ya.delivery.source.pvz.id"].(string)
+	source.PlatformStationId = sourcePvzId
 	priceRequest.Source = *source
 	destination := new(Destination)
 	destination.PlatformStationId = order.Data.PvzId

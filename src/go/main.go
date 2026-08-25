@@ -4,7 +4,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"math/rand"
 	"mime/multipart"
@@ -26,7 +26,7 @@ import (
 	"github.com/h2non/bimg"
 )
 
-//public routes
+// public routes
 func getItems(w http.ResponseWriter, r *http.Request) {
 	enableCors(w)
 	a, er := db.GetItems(r.URL.Query())
@@ -39,7 +39,7 @@ func getItems(w http.ResponseWriter, r *http.Request) {
 		it.Data.Links.Original = ""
 	}
 	resp, _ := json.Marshal(a)
-	fmt.Fprintf(w, string(resp))
+	fmt.Fprint(w, string(resp))
 }
 
 func getTags(w http.ResponseWriter, r *http.Request) {
@@ -52,7 +52,7 @@ func getTags(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	resp, _ := json.Marshal(allTags)
-	fmt.Fprintf(w, string(resp))
+	fmt.Fprint(w, string(resp))
 }
 
 func getMenu(w http.ResponseWriter, r *http.Request) {
@@ -69,7 +69,7 @@ func getMenu(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, er.Error(), http.StatusBadRequest)
 		return
 	}
-	fmt.Fprintf(w, string(resp))
+	fmt.Fprint(w, string(resp))
 }
 
 func getBonuses(w http.ResponseWriter, r *http.Request) {
@@ -86,7 +86,7 @@ func getBonuses(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, er.Error(), http.StatusBadRequest)
 		return
 	}
-	fmt.Fprintf(w, string(resp))
+	fmt.Fprint(w, string(resp))
 }
 
 func createOrder(w http.ResponseWriter, r *http.Request) {
@@ -307,10 +307,10 @@ func requestPayment(w http.ResponseWriter, r *http.Request) {
 		log.Println("Error saving payment details to DB, Token:  " + initRequest.Token +
 			" payment_link: " + response.PaymentURL)
 	}
-	w.Write([]byte(fmt.Sprintf("{\"link\": \"%s\"}", response.PaymentURL)))
+	w.Write(fmt.Appendf(nil, "{\"link\": \"%s\"}", response.PaymentURL))
 }
 
-//private
+// private
 func createItem(w http.ResponseWriter, r *http.Request) {
 	if !authChecker(w, r) {
 		return
@@ -349,7 +349,7 @@ func createItem(w http.ResponseWriter, r *http.Request) {
 		items = append(items, *i)
 	}
 	resp, _ := json.Marshal(items)
-	fmt.Fprintf(w, string(resp))
+	fmt.Fprint(w, string(resp))
 }
 
 func updateItem(w http.ResponseWriter, r *http.Request) {
@@ -383,7 +383,7 @@ func updateItem(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, er.Error(), http.StatusInternalServerError)
 	}
 	resp, _ := json.Marshal(updated)
-	fmt.Fprintf(w, string(resp))
+	fmt.Fprint(w, string(resp))
 }
 
 func updateCoverImage(w http.ResponseWriter, r *http.Request) {
@@ -435,7 +435,7 @@ func updateCoverImage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, er.Error(), http.StatusBadRequest)
 		return
 	}
-	fmt.Fprintf(w, string(resp))
+	fmt.Fprint(w, string(resp))
 }
 
 func createTag(w http.ResponseWriter, r *http.Request) {
@@ -460,7 +460,7 @@ func createTag(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	resp, _ := json.Marshal(allTags)
-	_, er = fmt.Fprintf(w, string(resp))
+	_, er = fmt.Fprint(w, string(resp))
 	if er != nil {
 		log.Println(er)
 		http.Error(w, er.Error(), http.StatusBadRequest)
@@ -496,7 +496,7 @@ func updateOrder(w http.ResponseWriter, r *http.Request) {
 	enableCors(w)
 	params := mux.Vars(r)
 	id := params["id"]
-	if len(id) < 0 {
+	if len(id) == 0 {
 		log.Println("There no {id} parameter in request " + r.URL.Path)
 		http.Error(w, "There no {id} parameter in request "+r.URL.Path, http.StatusBadRequest)
 		return
@@ -530,11 +530,11 @@ func handlePatchOrder(id int, r *http.Request) error {
 	/*patch := make(map[string]string)
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
-	er = decoder.Decode(&patch)*/
+	er = decoder.Decode(&patch)
 	if er != nil {
 		log.Println(er)
 		return er
-	}
+	}*/
 	advance := patch["advance"]
 	if len(advance) > 0 {
 		switch advance {
@@ -630,7 +630,7 @@ func handlePatchOrder(id int, r *http.Request) error {
 				return er
 			}
 			defer file.Close()
-			buff, er := ioutil.ReadAll(file)
+			buff, er := io.ReadAll(file)
 			if er != nil {
 				log.Println(er)
 				return er
@@ -677,7 +677,7 @@ func login(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }
 
-//handlers
+// handlers
 func authChecker(w http.ResponseWriter, r *http.Request) bool {
 	login, pss, ok := r.BasicAuth()
 	if !ok {
@@ -713,7 +713,7 @@ func appJson(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 }
 
-//functions
+// functions
 func parseId(r *http.Request) (int64, error) {
 	params := mux.Vars(r)
 	id := params["id"]

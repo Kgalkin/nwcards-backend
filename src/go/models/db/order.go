@@ -251,7 +251,7 @@ func GetOrderById(id int) (*Order, error) {
 		return nil, er
 	}
 	if len(orders) != 1 {
-		er := fmt.Errorf("Found %d orders with id: %s\n", len(orders), id)
+		er := fmt.Errorf("Found %d orders with id: %d\n", len(orders), id)
 		log.Println(er)
 		return nil, er
 	}
@@ -310,8 +310,7 @@ func CreateOrder(order Order) (*Order, error) {
 
 func (o *Order) ApplyDeliveryPriceModifiers() {
 	price := o.Data.GetDeliveryPrice()
-	if o.Data.DeliveryOption.Data.PriceModifiers != nil &&
-		len(o.Data.DeliveryOption.Data.PriceModifiers) > 0 {
+	if len(o.Data.DeliveryOption.Data.PriceModifiers) > 0 {
 		for _, pm := range o.Data.DeliveryOption.Data.PriceModifiers {
 			if o.isApplicable(pm.Constraints) {
 				if pm.Type == "plus" {
@@ -329,7 +328,7 @@ func (o *Order) ApplyDeliveryPriceModifiers() {
 }
 
 func (o *Order) isApplicable(cs []Constraint) bool {
-	if cs == nil || len(cs) == 0 {
+	if len(cs) == 0 {
 		return true
 	}
 	result := true
@@ -344,8 +343,7 @@ func (o *Order) isApplicable(cs []Constraint) bool {
 
 func (o *Order) getItemsPrice() int {
 	price := 0
-	if o.Data.Items != nil &&
-		len(o.Data.Items) > 0 {
+	if len(o.Data.Items) > 0 {
 		for _, item := range o.Data.Items {
 			price = price + item.Price*item.Count
 		}

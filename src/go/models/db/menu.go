@@ -1,14 +1,17 @@
 package db
 
 type MenuItem struct {
-	Name string  `json:"name"`
-	Data Map `json:"data"`
+	Name string `json:"name"`
+	Data Map    `json:"data"`
 }
 
 func GetMenuItems() ([]*MenuItem, error) {
 	items := make([]*MenuItem, 0)
 	rows, er := db.Query("SELECT * FROM menu")
 	if er != nil {
+		return nil, er
+	}
+	if er = rows.Err(); er != nil {
 		return nil, er
 	}
 	defer rows.Close()

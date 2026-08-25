@@ -31,11 +31,9 @@ func AdjustOrder(order *db.Order) error {
 		}
 	}
 
-	if activeBonuses != nil {
-		for _, bonus := range activeBonuses {
-			if bonus.Type == db.ITEM_WRAPPER_TYPE {
-				processItemWrapperBonus(order, bonus.Data)
-			}
+	for _, bonus := range activeBonuses {
+		if bonus.Type == db.ITEM_WRAPPER_TYPE {
+			processItemWrapperBonus(order, bonus.Data)
 		}
 	}
 
@@ -44,9 +42,21 @@ func AdjustOrder(order *db.Order) error {
 		log.Println(er)
 		return er
 	}
+
 	order.Data.DeliveryOption = *deliveryOption
 	if deliveryOption.Id == 7 { //if yandex delivery
-		pr, er := ya.NewPriceRequest(*order)
+		var sourcePvzId string = ""
+		for _, i := range deliveryOption.Data.AdditionalRequirements {
+			if i.Type == "ya_widget" {
+				sourcePvzId = i.Identifiers["sourcePvzId"]
+			}
+		}
+		if sourcePvzId == "" {
+			er = fmt.Errorf("Empty sourcePvzId on ya_widget !\n")
+			log.Println(er)
+			return er
+		}
+		pr, er := ya.NewPriceRequest(*order, sourcePvzId)
 		if er != nil {
 			log.Println(er)
 			return er
@@ -137,7 +147,7 @@ func FillOrder(order *db.Order) error {
 		log.Println(er)
 		return er
 	}
-	for i, _ := range order.Data.Items {
+	for i := range order.Data.Items {
 		item := &order.Data.Items[i]
 		for i, it := range items.Items {
 			if it.Id == item.Id {
@@ -153,7 +163,7 @@ func FillOrder(order *db.Order) error {
 				break
 			}
 			if i+1 == len(items.Items) {
-				return errors.New(fmt.Sprintf("\nItem with ID: %d, not found in the database\n", item.Id))
+				return fmt.Errorf("\nItem with ID: %d, not found in the database\n", item.Id)
 			}
 		}
 	}
